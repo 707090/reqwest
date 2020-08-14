@@ -1,17 +1,13 @@
-use http::Method;
 use std::future::Future;
-use wasm_bindgen::prelude::{wasm_bindgen, UnwrapThrowExt as _};
-use js_sys::Promise;
-use url::Url;
 
-use super::{Request, RequestBuilder, Response};
+use http::Method;
+use url::Url;
+use wasm_bindgen::prelude::UnwrapThrowExt;
+use web_sys::window;
+
 use crate::IntoUrl;
 
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_name = fetch)]
-    fn fetch_with_request(input: &web_sys::Request) -> Promise;
-}
+use super::{Request, RequestBuilder, Response, timeout::FetchTimeout};
 
 /// dox
 #[derive(Clone, Debug)]
@@ -114,14 +110,14 @@ impl Client {
     pub fn execute(
         &self,
         request: Request,
-    ) -> impl Future<Output = Result<Response, crate::Error>> {
+    ) -> impl Future<Output=Result<Response, crate::Error>> {
         self.execute_request(request)
     }
 
     pub(super) fn execute_request(
         &self,
         req: Request,
-    ) -> impl Future<Output = crate::Result<Response>> {
+    ) -> impl Future<Output=crate::Result<Response>> {
         fetch(req)
     }
 }
@@ -161,14 +157,14 @@ async fn fetch(req: Request) -> crate::Result<Response> {
         init.body(Some(&body.to_js_value()?.as_ref().as_ref()));
     }
 
-    let js_req = web_sys::Request::new_with_str_and_init(req.url().as_str(), &init)
-        .map_err(crate::error::wasm)
-        .map_err(crate::error::builder)?;
+    // Do not inline this variable. The FetchTimeout uses the drop to cancel the timeout when it falls out of scope.
+    let timeout = req.timeout.map(FetchTimeout::new);
+    init.signal(timeout.as_ref().map(|timeout| timeout.signal()));
 
-    // Await the fetch() promise
-    let p = fetch_with_request(&js_req);
-    let js_resp = super::promise::<web_sys::Response>(p)
-        .await
+    let fetch_promise = window()
+        .expect_throw("Fetch API requires window")
+        .fetch_with_str_and_init(&req.url().as_str(), &init);
+    let js_resp = super::promise::<web_sys::Response>(fetch_promise).await
         .map_err(crate::error::request)?;
 
     // Convert from the js Response
@@ -195,8 +191,6 @@ async fn fetch(req: Request) -> crate::Result<Response> {
         .map(|resp| Response::new(resp, url))
         .map_err(crate::error::request)
 }
-
-// ===== impl ClientBuilder =====
 
 impl ClientBuilder {
     /// dox
