@@ -1,3 +1,5 @@
+use reqwest::RequestBuilder;
+
 #[cfg(feature = "__tls")]
 #[tokio::test]
 async fn test_badssl_modern() {
@@ -14,12 +16,12 @@ async fn test_badssl_modern() {
 #[cfg(feature = "rustls-tls")]
 #[tokio::test]
 async fn test_rustls_badssl_modern() {
-    let text = reqwest::Client::builder()
+    let client = reqwest::Client::builder()
         .use_rustls_tls()
         .build()
-        .unwrap()
-        .get("https://mozilla-modern.badssl.com/")
-        .send()
+        .unwrap();
+    let text = RequestBuilder::get("https://mozilla-modern.badssl.com/")
+        .send_with(&client)
         .await
         .unwrap()
         .text()
@@ -32,12 +34,12 @@ async fn test_rustls_badssl_modern() {
 #[cfg(feature = "__tls")]
 #[tokio::test]
 async fn test_badssl_self_signed() {
-    let text = reqwest::Client::builder()
+    let client = reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
         .build()
-        .unwrap()
-        .get("https://self-signed.badssl.com/")
-        .send()
+        .unwrap();
+    let text = RequestBuilder::get("https://self-signed.badssl.com/")
+        .send_with(&client)
         .await
         .unwrap()
         .text()
@@ -50,12 +52,12 @@ async fn test_badssl_self_signed() {
 #[cfg(feature = "native-tls")]
 #[tokio::test]
 async fn test_badssl_wrong_host() {
-    let text = reqwest::Client::builder()
+    let client = reqwest::Client::builder()
         .danger_accept_invalid_hostnames(true)
         .build()
-        .unwrap()
-        .get("https://wrong.host.badssl.com/")
-        .send()
+        .unwrap();
+    let text = RequestBuilder::get("https://wrong.host.badssl.com/")
+        .send_with(&client)
         .await
         .unwrap()
         .text()
@@ -64,12 +66,8 @@ async fn test_badssl_wrong_host() {
 
     assert!(text.contains("<title>wrong.host.badssl.com</title>"));
 
-    let result = reqwest::Client::builder()
-        .danger_accept_invalid_hostnames(true)
-        .build()
-        .unwrap()
-        .get("https://self-signed.badssl.com/")
-        .send()
+    let result = RequestBuilder::get("https://self-signed.badssl.com/")
+        .send_with(&client)
         .await;
 
     assert!(result.is_err());

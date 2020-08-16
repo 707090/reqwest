@@ -1,9 +1,8 @@
 #[tokio::main]
 async fn main() {
-    reqwest::Client::new()
-        .post("http://www.baidu.com")
+    reqwest::RequestBuilder::post("http://www.baidu.com")
         .form(&[("one", "1")])
-        .send()
+        .send_with(&reqwest::Client::new())
         .await
         .unwrap();
 }

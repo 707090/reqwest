@@ -1,6 +1,7 @@
 mod support;
 use std::io::Read;
 use support::*;
+use reqwest::RequestBuilder;
 
 #[tokio::test]
 async fn brotli_response() {
@@ -25,9 +26,8 @@ async fn test_brotli_empty_body() {
     });
 
     let client = reqwest::Client::new();
-    let res = client
-        .head(&format!("http://{}/brotli", server.addr()))
-        .send()
+    let res = RequestBuilder::head(&format!("http://{}/brotli", server.addr()))
+        .send_with(&client)
         .await
         .unwrap();
 
@@ -49,13 +49,12 @@ async fn test_accept_header_is_not_changed_if_set() {
 
     let client = reqwest::Client::new();
 
-    let res = client
-        .get(&format!("http://{}/accept", server.addr()))
+    let res = RequestBuilder::get(&format!("http://{}/accept", server.addr()))
         .header(
             reqwest::header::ACCEPT,
             reqwest::header::HeaderValue::from_static("application/json"),
         )
-        .send()
+        .send_with(&client)
         .await
         .unwrap();
 
@@ -72,13 +71,12 @@ async fn test_accept_encoding_header_is_not_changed_if_set() {
 
     let client = reqwest::Client::new();
 
-    let res = client
-        .get(&format!("http://{}/accept-encoding", server.addr()))
+    let res = RequestBuilder::get(&format!("http://{}/accept-encoding", server.addr()))
         .header(
             reqwest::header::ACCEPT_ENCODING,
             reqwest::header::HeaderValue::from_static("identity"),
         )
-        .send()
+        .send_with(&client)
         .await
         .unwrap();
 
@@ -137,9 +135,8 @@ async fn brotli_case(response_size: usize, chunk_size: usize) {
 
     let client = reqwest::Client::new();
 
-    let res = client
-        .get(&format!("http://{}/brotli", server.addr()))
-        .send()
+    let res = RequestBuilder::get(&format!("http://{}/brotli", server.addr()))
+        .send_with(&client)
         .await
         .expect("response");
 

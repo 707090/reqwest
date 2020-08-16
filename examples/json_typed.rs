@@ -6,6 +6,7 @@
 
 // These require the `serde` dependency.
 use serde::{Deserialize, Serialize};
+use reqwest::RequestBuilder;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Post {
@@ -27,10 +28,9 @@ async fn main() -> Result<(), reqwest::Error> {
         body: "https://docs.rs/reqwest".into(),
         user_id: 1,
     };
-    let new_post: Post = reqwest::Client::new()
-        .post("https://jsonplaceholder.typicode.com/posts")
+    let new_post: Post = RequestBuilder::post("https://jsonplaceholder.typicode.com/posts")
         .json(&new_post)
-        .send()
+        .send_with(&reqwest::Client::new())
         .await?
         .json()
         .await?;

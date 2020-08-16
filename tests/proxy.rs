@@ -2,6 +2,7 @@ mod support;
 use support::*;
 
 use std::env;
+use reqwest::RequestBuilder;
 
 #[tokio::test]
 async fn http_proxy() {
@@ -16,12 +17,12 @@ async fn http_proxy() {
 
     let proxy = format!("http://{}", server.addr());
 
-    let res = reqwest::Client::builder()
+    let client = reqwest::Client::builder()
         .proxy(reqwest::Proxy::http(&proxy).unwrap())
         .build()
-        .unwrap()
-        .get(url)
-        .send()
+        .unwrap();
+    let res = RequestBuilder::get(url)
+        .send_with(&client)
         .await
         .unwrap();
 
@@ -46,16 +47,16 @@ async fn http_proxy_basic_auth() {
 
     let proxy = format!("http://{}", server.addr());
 
-    let res = reqwest::Client::builder()
+    let client = reqwest::Client::builder()
         .proxy(
             reqwest::Proxy::http(&proxy)
                 .unwrap()
                 .basic_auth("Aladdin", "open sesame"),
         )
         .build()
-        .unwrap()
-        .get(url)
-        .send()
+        .unwrap();
+    let res = RequestBuilder::get(url)
+        .send_with(&client)
         .await
         .unwrap();
 
@@ -80,12 +81,12 @@ async fn http_proxy_basic_auth_parsed() {
 
     let proxy = format!("http://Aladdin:open sesame@{}", server.addr());
 
-    let res = reqwest::Client::builder()
+    let client = reqwest::Client::builder()
         .proxy(reqwest::Proxy::http(&proxy).unwrap())
         .build()
-        .unwrap()
-        .get(url)
-        .send()
+        .unwrap();
+    let res = RequestBuilder::get(url)
+        .send_with(&client)
         .await
         .unwrap();
 
@@ -104,14 +105,14 @@ async fn test_no_proxy() {
     let proxy = format!("http://{}", server.addr());
     let url = format!("http://{}/4", server.addr());
 
-    // set up proxy and use no_proxy to clear up client builder proxies.
-    let res = reqwest::Client::builder()
+    let client = reqwest::Client::builder()
         .proxy(reqwest::Proxy::http(&proxy).unwrap())
         .no_proxy()
         .build()
-        .unwrap()
-        .get(&url)
-        .send()
+        .unwrap();
+    // set up proxy and use no_proxy to clear up client builder proxies.
+    let res = RequestBuilder::get(&url)
+        .send_with(&client)
         .await
         .unwrap();
 
@@ -166,12 +167,12 @@ async fn http_over_http() {
 
     let proxy = format!("http://{}", server.addr());
 
-    let res = reqwest::Client::builder()
+    let client = reqwest::Client::builder()
         .proxy(reqwest::Proxy::http(&proxy).unwrap())
         .build()
-        .unwrap()
-        .get(url)
-        .send()
+        .unwrap();
+    let res = RequestBuilder::get(url)
+        .send_with(&client)
         .await
         .unwrap();
 

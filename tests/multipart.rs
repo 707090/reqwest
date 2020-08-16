@@ -1,6 +1,7 @@
 mod support;
 use futures_util::stream::StreamExt;
 use support::*;
+use reqwest::RequestBuilder;
 
 #[tokio::test]
 async fn text_part() {
@@ -44,10 +45,9 @@ async fn text_part() {
 
     let url = format!("http://{}/multipart/1", server.addr());
 
-    let res = reqwest::Client::new()
-        .post(&url)
+    let res = RequestBuilder::post(&url)
         .multipart(form)
-        .send()
+        .send_with(&reqwest::Client::new())
         .await
         .unwrap();
 
@@ -111,10 +111,9 @@ async fn stream_part() {
 
     let client = reqwest::Client::new();
 
-    let res = client
-        .post(&url)
+    let res = RequestBuilder::post(&url)
         .multipart(form)
-        .send()
+        .send_with(&client)
         .await
         .expect("Failed to post multipart");
     assert_eq!(res.url().as_str(), &url);
@@ -171,10 +170,9 @@ fn blocking_file_part() {
 
     let url = format!("http://{}/multipart/2", server.addr());
 
-    let res = reqwest::blocking::Client::new()
-        .post(&url)
+    let res = reqwest::blocking::RequestBuilder::post(&url)
         .multipart(form)
-        .send()
+        .send_with(&reqwest::blocking::Client::new())
         .unwrap();
 
     assert_eq!(res.url().as_str(), &url);
