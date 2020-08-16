@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 #[cfg(any(
     feature = "native-tls",
     feature = "rustls-tls",
@@ -586,6 +587,9 @@ impl Client {
     /// # Errors
     ///
     /// This method fails whenever supplied `Url` cannot be parsed.
+    #[deprecated(
+        note = "Use RequestBuilder::get instead to build without a client, and use the send_with method to specify the client during send"
+    )]
     pub fn get<U: IntoUrl>(&self, url: U) -> RequestBuilder {
         self.request(Method::GET, url)
     }
@@ -595,6 +599,9 @@ impl Client {
     /// # Errors
     ///
     /// This method fails whenever supplied `Url` cannot be parsed.
+    #[deprecated(
+        note = "Use RequestBuilder::post instead to build without a client, and use the send_with method to specify the client during send"
+    )]
     pub fn post<U: IntoUrl>(&self, url: U) -> RequestBuilder {
         self.request(Method::POST, url)
     }
@@ -604,6 +611,9 @@ impl Client {
     /// # Errors
     ///
     /// This method fails whenever supplied `Url` cannot be parsed.
+    #[deprecated(
+        note = "Use RequestBuilder::put instead to build without a client, and use the send_with method to specify the client during send"
+    )]
     pub fn put<U: IntoUrl>(&self, url: U) -> RequestBuilder {
         self.request(Method::PUT, url)
     }
@@ -613,6 +623,9 @@ impl Client {
     /// # Errors
     ///
     /// This method fails whenever supplied `Url` cannot be parsed.
+    #[deprecated(
+        note = "Use RequestBuilder::patch instead to build without a client, and use the send_with method to specify the client during send"
+    )]
     pub fn patch<U: IntoUrl>(&self, url: U) -> RequestBuilder {
         self.request(Method::PATCH, url)
     }
@@ -622,6 +635,9 @@ impl Client {
     /// # Errors
     ///
     /// This method fails whenever supplied `Url` cannot be parsed.
+    #[deprecated(
+        note = "Use RequestBuilder::delete instead to build without a client, and use the send_with method to specify the client during send"
+    )]
     pub fn delete<U: IntoUrl>(&self, url: U) -> RequestBuilder {
         self.request(Method::DELETE, url)
     }
@@ -631,6 +647,9 @@ impl Client {
     /// # Errors
     ///
     /// This method fails whenever supplied `Url` cannot be parsed.
+    #[deprecated(
+        note = "Use RequestBuilder::head instead to build without a client, and use the send_with method to specify the client during send"
+    )]
     pub fn head<U: IntoUrl>(&self, url: U) -> RequestBuilder {
         self.request(Method::HEAD, url)
     }
@@ -643,9 +662,13 @@ impl Client {
     /// # Errors
     ///
     /// This method fails whenever supplied `Url` cannot be parsed.
+    #[deprecated(
+        note = "Use RequestBuilder::new instead to build without a client, and use the send_with method to specify the client during send"
+    )]
     pub fn request<U: IntoUrl>(&self, method: Method, url: U) -> RequestBuilder {
-        let req = url.into_url().map(move |url| Request::new(method, url));
-        RequestBuilder::new(self.clone(), req)
+        let mut builder = RequestBuilder::new(method, url);
+        builder.client = Some(self.clone());
+        builder
     }
 
     /// Executes a `Request`.

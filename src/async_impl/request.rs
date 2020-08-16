@@ -1,17 +1,14 @@
 use std::future::Future;
-use std::time::Duration;
 
-use crate::{Method, Url};
-use crate::header::{CONTENT_LENGTH, CONTENT_TYPE, HeaderMap};
+use crate::core::request::NoClientError;
+use crate::header::{CONTENT_LENGTH, CONTENT_TYPE};
 
-use super::client::Pending;
-use super::multipart;
-use super::response::Response;
+use super::{Client, client::Pending, multipart, response::Response};
 
 /// A request which can be executed with `Client::execute()`.
 pub type Request = crate::core::request::Request<super::Body>;
 /// A builder to construct the properties of a `Request`.
-pub type RequestBuilder = crate::core::request::RequestBuilder<super::Client, super::Body>;
+pub type RequestBuilder = crate::core::request::RequestBuilder<Client, super::Body>;
 
 impl Request {
     /// Attempt to clone the request.
@@ -27,10 +24,6 @@ impl Request {
         *req.headers_mut() = self.headers().clone();
         req.body = body;
         Some(req)
-    }
-
-    pub(super) fn pieces(self) -> (Method, Url, HeaderMap, Option<super::Body>, Option<Duration>) {
-        (self.method, self.url, self.headers, self.body, self.timeout)
     }
 }
 
@@ -71,13 +64,16 @@ impl RequestBuilder {
         builder
     }
 
-    /// Constructs the Request and sends it to the target URL, returning a
-    /// future Response.
+    /// Constructs the Request and sends it to the target URL using the client which created
+    /// this builder and returns a future Response.
     ///
     /// # Errors
     ///
-    /// This method fails if there was an error while sending request,
+    /// This method fails if there was an error while building the request, sending the request,
     /// redirect loop was detected or redirect limit was exhausted.
+    ///
+    /// The method also errors if the request builder was not created from a client. The preferred
+    /// method is to create the builder without a client and use the [send_with](send_with) method.
     ///
     /// # Example
     ///
@@ -92,9 +88,41 @@ impl RequestBuilder {
     /// # Ok(())
     /// # }
     /// ```
+    #[deprecated(
+    note = "Use RequestBuilder::new instead to build without a client, and use the send_with method to specify the client during send"
+    )]
     pub fn send(self) -> impl Future<Output=Result<Response, crate::Error>> {
+        // Cannot delegate to send_with because return types need to match
+        match (self.client, self.request) {
+            (Some(client), Ok(req)) => client.execute_request(req),
+            (None, _) => Pending::new_err(crate::error::builder(NoClientError)),
+            (_, Err(err)) => Pending::new_err(err),
+        }
+    }
+
+    /// Constructs the Request and sends it to the target URL using the specified client
+    /// and returns a future Response.
+    ///
+    /// # Errors
+    ///
+    /// This method fails if there was an error while building the request, sending the request,
+    /// redirect loop was detected or redirect limit was exhausted.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use reqwest::Error;
+    /// #
+    /// # async fn run() -> Result<(), Error> {
+    /// let response = reqwest::RequestBuilder::get("https://hyper.rs")
+    ///     .send_with(&reqwest::Client::new())
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn send_with(self, client: &Client) -> impl Future<Output=Result<Response, crate::Error>> {
         match self.request {
-            Ok(req) => self.client.execute_request(req),
+            Ok(req) => client.execute_request(req),
             Err(err) => Pending::new_err(err),
         }
     }
@@ -138,32 +166,28 @@ mod tests {
     use http::Request as HttpRequest;
     use serde::Serialize;
 
-    use crate::Method;
+    use crate::{Method, RequestBuilder};
 
-    use super::{Request, super::Client};
+    use super::Request;
 
     #[test]
     fn add_query_append() {
-        let client = Client::new();
         let some_url = "https://google.com/";
-        let r = client.get(some_url);
-
-        let r = r.query(&[("foo", "bar")]);
-        let r = r.query(&[("qux", 3)]);
-
-        let req = r.build().expect("request is valid");
+        let req = RequestBuilder::get(some_url)
+            .query(&[("foo", "bar")])
+            .query(&[("qux", 3)])
+            .build()
+            .expect("request is valid");
         assert_eq!(req.url().query(), Some("foo=bar&qux=3"));
     }
 
     #[test]
     fn add_query_append_same() {
-        let client = Client::new();
         let some_url = "https://google.com/";
-        let r = client.get(some_url);
-
-        let r = r.query(&[("foo", "a"), ("foo", "b")]);
-
-        let req = r.build().expect("request is valid");
+        let req = RequestBuilder::get(some_url)
+            .query(&[("foo", "a"), ("foo", "b")])
+            .build()
+            .expect("request is valid");
         assert_eq!(req.url().query(), Some("foo=a&foo=b"));
     }
 
@@ -175,18 +199,15 @@ mod tests {
             qux: i32,
         }
 
-        let client = Client::new();
         let some_url = "https://google.com/";
-        let r = client.get(some_url);
-
         let params = Params {
             foo: "bar".into(),
             qux: 3,
         };
-
-        let r = r.query(&params);
-
-        let req = r.build().expect("request is valid");
+        let req = RequestBuilder::get(some_url)
+            .query(&params)
+            .build()
+            .expect("request is valid");
         assert_eq!(req.url().query(), Some("foo=bar&qux=3"));
     }
 
@@ -196,13 +217,11 @@ mod tests {
         params.insert("foo", "bar");
         params.insert("qux", "three");
 
-        let client = Client::new();
         let some_url = "https://google.com/";
-        let r = client.get(some_url);
-
-        let r = r.query(&params);
-
-        let req = r.build().expect("request is valid");
+        let req = RequestBuilder::get(some_url)
+            .query(&params)
+            .build()
+            .expect("request is valid");
         assert_eq!(req.url().query(), Some("foo=bar&qux=three"));
     }
 
@@ -214,9 +233,7 @@ mod tests {
         headers.insert("foo", "bar".parse().unwrap());
         headers.append("foo", "baz".parse().unwrap());
 
-        let client = Client::new();
-        let req = client
-            .get("https://hyper.rs")
+        let req = RequestBuilder::get("https://hyper.rs")
             .header("im-a", "keeper")
             .header("foo", "pop me")
             .headers(headers)
@@ -233,12 +250,10 @@ mod tests {
 
     #[test]
     fn normalize_empty_query() {
-        let client = Client::new();
         let some_url = "https://google.com/";
         let empty_query: &[(&str, &str)] = &[];
 
-        let req = client
-            .get(some_url)
+        let req = RequestBuilder::get(some_url)
             .query(empty_query)
             .build()
             .expect("request build");
@@ -249,8 +264,7 @@ mod tests {
 
     #[test]
     fn try_clone_reusable() {
-        let client = Client::new();
-        let builder = client.post("http://httpbin.org/post")
+        let builder = RequestBuilder::post("http://httpbin.org/post")
             .header("foo", "bar")
             .body("from a &str!");
         let req = builder
@@ -265,9 +279,7 @@ mod tests {
 
     #[test]
     fn try_clone_no_body() {
-        let client = Client::new();
-        let builder = client.get("http://httpbin.org/get");
-        let req = builder
+        let req = RequestBuilder::get("http://httpbin.org/get")
             .try_clone()
             .expect("clone successful")
             .build()
@@ -286,8 +298,8 @@ mod tests {
             Ok("world"),
         ];
         let stream = futures_util::stream::iter(chunks);
-        let client = Client::new();
-        let builder = client.get("http://httpbin.org/get")
+
+        let builder = RequestBuilder::get("http://httpbin.org/get")
             .body(super::super::Body::wrap_stream(stream));
         let clone = builder.try_clone();
         assert!(clone.is_none());
@@ -295,11 +307,9 @@ mod tests {
 
     #[test]
     fn convert_url_authority_into_basic_auth() {
-        let client = Client::new();
         let some_url = "https://Aladdin:open sesame@localhost/";
 
-        let req = client
-            .get(some_url)
+        let req = RequestBuilder::get(some_url)
             .build()
             .expect("request build");
 
@@ -309,11 +319,9 @@ mod tests {
 
     #[test]
     fn test_basic_auth_sensitive_header() {
-        let client = Client::new();
         let some_url = "https://localhost/";
 
-        let req = client
-            .get(some_url)
+        let req = RequestBuilder::get(some_url)
             .basic_auth("Aladdin", Some("open sesame"))
             .build()
             .expect("request build");
@@ -325,11 +333,9 @@ mod tests {
 
     #[test]
     fn test_bearer_auth_sensitive_header() {
-        let client = Client::new();
         let some_url = "https://localhost/";
 
-        let req = client
-            .get(some_url)
+        let req = RequestBuilder::get(some_url)
             .bearer_auth("Hold my bear")
             .build()
             .expect("request build");

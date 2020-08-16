@@ -9,6 +9,7 @@ use serde_json;
 use url::Url;
 
 use crate::header::{HeaderMap, HeaderName, HeaderValue, CONTENT_TYPE};
+use crate::IntoUrl;
 use crate::Method;
 
 /// A request which can be executed with `Client::execute()`.
@@ -130,16 +131,25 @@ where
 
 /// A builder to construct the properties of a `Request`.
 pub struct RequestBuilder<Client, Body> {
-    pub(crate) client: Client,
+    pub(crate) client: Option<Client>,
     pub(crate) request: crate::Result<Request<Body>>,
 }
 
 impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
-    pub(crate) fn new(
-        client: Client,
-        request: crate::Result<Request<Body>>,
-    ) -> RequestBuilder<Client, Body> {
-        let mut builder = RequestBuilder { client, request };
+    /// Start building a `Request` with the `Method` and `Url`.
+    ///
+    /// Returns a `RequestBuilder`, which will allow setting headers and
+    /// request body before sending.
+    ///
+    /// # Errors
+    ///
+    /// This method fails whenever supplied `Url` cannot be parsed.
+    pub fn new<U: IntoUrl>(method: Method, url: U) -> RequestBuilder<Client, Body> {
+        let request = url.into_url().map(move |url| Request::new(method, url));
+        let mut builder = RequestBuilder {
+            client: None,
+            request,
+        };
 
         let auth = builder
             .request
@@ -153,6 +163,61 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
             builder
         }
     }
+
+    /// Convenience method to make a `GET` request to a URL.
+    ///
+    /// # Errors
+    ///
+    /// This method fails whenever supplied `Url` cannot be parsed.
+    pub fn get<U: IntoUrl>(url: U) -> RequestBuilder<Client, Body> {
+        RequestBuilder::new(Method::GET, url)
+    }
+
+    /// Convenience method to make a `POST` request to a URL.
+    ///
+    /// # Errors
+    ///
+    /// This method fails whenever supplied `Url` cannot be parsed.
+    pub fn post<U: IntoUrl>(url: U) -> RequestBuilder<Client, Body> {
+        RequestBuilder::new(Method::POST, url)
+    }
+
+    /// Convenience method to make a `PUT` request to a URL.
+    ///
+    /// # Errors
+    ///
+    /// This method fails whenever supplied `Url` cannot be parsed.
+    pub fn put<U: IntoUrl>(url: U) -> RequestBuilder<Client, Body> {
+        RequestBuilder::new(Method::PUT, url)
+    }
+
+    /// Convenience method to make a `PATCH` request to a URL.
+    ///
+    /// # Errors
+    ///
+    /// This method fails whenever supplied `Url` cannot be parsed.
+    pub fn patch<U: IntoUrl>(url: U) -> RequestBuilder<Client, Body> {
+        RequestBuilder::new(Method::PATCH, url)
+    }
+
+    /// Convenience method to make a `DELETE` request to a URL.
+    ///
+    /// # Errors
+    ///
+    /// This method fails whenever supplied `Url` cannot be parsed.
+    pub fn delete<U: IntoUrl>(url: U) -> RequestBuilder<Client, Body> {
+        RequestBuilder::new(Method::DELETE, url)
+    }
+
+    /// Convenience method to make a `HEAD` request to a URL.
+    ///
+    /// # Errors
+    ///
+    /// This method fails whenever supplied `Url` cannot be parsed.
+    pub fn head<U: IntoUrl>(url: U) -> RequestBuilder<Client, Body> {
+        RequestBuilder::new(Method::HEAD, url)
+    }
+
     /// Add a `Header` to this Request.
     ///
     /// ```rust
@@ -558,6 +623,17 @@ fn fmt_request_fields<'a, 'b, Body>(
         .field("url", &req.url)
         .field("headers", &req.headers)
 }
+
+#[derive(Debug)]
+pub(crate) struct NoClientError;
+
+impl std::fmt::Display for NoClientError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str("Cannot send request without a client. Use the `send_with` method if the request builder was created from scratch (preferred)")
+    }
+}
+
+impl std::error::Error for NoClientError {}
 
 /// Check the request URL for a "username:password" type authority, and if
 /// found, remove it from the URL and return it.
