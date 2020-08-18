@@ -61,7 +61,7 @@ mod client;
 pub mod multipart;
 mod request;
 mod response;
-mod wait;
+mod executor;
 
 pub use self::body::Body;
 pub use self::client::{Client, ClientBuilder};

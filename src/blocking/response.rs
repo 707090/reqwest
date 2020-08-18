@@ -12,7 +12,7 @@ use hyper::header::HeaderMap;
 use serde::de::DeserializeOwned;
 
 use super::client::KeepCoreThreadAlive;
-use super::wait;
+use super::executor;
 #[cfg(feature = "cookies")]
 use crate::cookie;
 use crate::{async_impl, StatusCode, Url, Version};
@@ -226,10 +226,10 @@ impl Response {
     /// [`serde_json::from_reader`]: https://docs.serde.rs/serde_json/fn.from_reader.html
     #[cfg(feature = "json")]
     pub fn json<T: DeserializeOwned>(self) -> crate::Result<T> {
-        wait::timeout(self.inner.json(), self.timeout).map_err(|e| match e {
-            wait::Waited::TimedOut(e) => crate::error::decode(e),
-            wait::Waited::Inner(e) => e,
-        })
+        executor::execute_blocking_flatten_timeout(
+            self.inner.json(),
+            self.timeout,
+            crate::error::decode)
     }
 
     /// Get the full response body as `Bytes`.
@@ -245,10 +245,10 @@ impl Response {
     /// # }
     /// ```
     pub fn bytes(self) -> crate::Result<Bytes> {
-        wait::timeout(self.inner.bytes(), self.timeout).map_err(|e| match e {
-            wait::Waited::TimedOut(e) => crate::error::decode(e),
-            wait::Waited::Inner(e) => e,
-        })
+        executor::execute_blocking_flatten_timeout(
+            self.inner.bytes(),
+            self.timeout,
+            crate::error::decode)
     }
 
     /// Get the response text.
@@ -292,12 +292,10 @@ impl Response {
     /// # }
     /// ```
     pub fn text_with_charset(self, default_encoding: &str) -> crate::Result<String> {
-        wait::timeout(self.inner.text_with_charset(default_encoding), self.timeout).map_err(|e| {
-            match e {
-                wait::Waited::TimedOut(e) => crate::error::decode(e),
-                wait::Waited::Inner(e) => e,
-            }
-        })
+        executor::execute_blocking_flatten_timeout(
+            self.inner.text_with_charset(default_encoding),
+            self.timeout,
+            crate::error::decode)
     }
 
     /// Copy the response body into a writer.
@@ -398,10 +396,10 @@ impl Read for Response {
         use futures_util::io::AsyncReadExt;
 
         let timeout = self.timeout;
-        wait::timeout(self.body_mut().read(buf), timeout).map_err(|e| match e {
-            wait::Waited::TimedOut(e) => crate::error::decode(e).into_io(),
-            wait::Waited::Inner(e) => e,
-        })
+        executor::execute_blocking_flatten_timeout(
+            self.body_mut().read(buf),
+            timeout,
+            |timeout_error| crate::error::decode(timeout_error).into_io())
     }
 }
 

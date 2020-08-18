@@ -23,7 +23,7 @@ use crate::{Certificate, Identity};
 
 use super::request::Request;
 use super::response::Response;
-use super::wait;
+use super::executor;
 
 /// A `Client` to make Requests with.
 ///
@@ -699,10 +699,10 @@ impl ClientHandle {
 			.map_err(crate::error::builder)?;
 
 		// Wait for the runtime thread to start up...
-		match wait::timeout(spawn_rx, None) {
-			Ok(Ok(())) => (),
+		match executor::execute_blocking(spawn_rx) {
+			Ok(Ok(_)) => (),
 			Ok(Err(err)) => return Err(err),
-			Err(_canceled) => event_loop_panicked(),
+			Err(_cancelled) => event_loop_panicked(),
 		}
 
 		let inner_handle = Arc::new(InnerClientHandle {
@@ -729,30 +729,24 @@ impl ClientHandle {
 			.send((req, tx))
 			.expect("core thread panicked");
 
-		let result: Result<crate::Result<async_impl::Response>, wait::Waited<crate::Error>> =
+		let send_future = async move {
 			if let Some(body) = body {
-				let f = async move {
-					body.send().await?;
-					rx.await.map_err(|_canceled| event_loop_panicked())
-				};
-				wait::timeout(f, timeout)
-			} else {
-				let f = async move {
-					rx.await.map_err(|_canceled| event_loop_panicked())
-				};
-				wait::timeout(f, timeout)
-			};
+				body.send().await?;
+			}
+			rx.await.map_err(|_canceled| event_loop_panicked()).unwrap()
+		};
 
-		match result {
-			Ok(Err(err)) => Err(err.with_url(url)),
-			Ok(Ok(res)) => Ok(Response::new(
-				res,
+		executor::execute_blocking_flatten_timeout(
+				send_future,
+				timeout,
+				|timeout_err| crate::error::request(timeout_err).with_url(url.clone())
+			)
+			.map(|response| Response::new(
+				response,
 				self.timeout.0,
 				KeepCoreThreadAlive(Some(self.inner.clone())),
-			)),
-			Err(wait::Waited::TimedOut(e)) => Err(crate::error::request(e).with_url(url)),
-			Err(wait::Waited::Inner(err)) => Err(err.with_url(url)),
-		}
+			))
+			.map_err(|response_error| response_error.with_url(url.clone()))
 	}
 }
 
