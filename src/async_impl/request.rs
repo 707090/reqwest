@@ -1,6 +1,5 @@
 use std::future::Future;
 
-use crate::core::request::NoClientError;
 use crate::header::{CONTENT_LENGTH, CONTENT_TYPE};
 
 use super::{Client, client::Pending, multipart, response::Response};
@@ -8,7 +7,7 @@ use super::{Client, client::Pending, multipart, response::Response};
 /// A request which can be executed with `Client::execute()`.
 pub type Request = crate::core::request::Request<super::Body>;
 /// A builder to construct the properties of a `Request`.
-pub type RequestBuilder = crate::core::request::RequestBuilder<Client, super::Body>;
+pub type RequestBuilder = crate::core::request::RequestBuilder<super::Body>;
 
 impl Request {
     /// Attempt to clone the request.
@@ -40,9 +39,9 @@ impl RequestBuilder {
     ///     .text("key4", "value4");
     ///
     ///
-    /// let response = client.post("your url")
+    /// let response = reqwest::RequestBuilder::post("your url")
     ///     .multipart(form)
-    ///     .send()
+    ///     .send(&client)
     ///     .await?;
     /// # Ok(())
     /// # }
@@ -64,44 +63,8 @@ impl RequestBuilder {
         builder
     }
 
-    /// Constructs the Request and sends it to the target URL using the client which created
-    /// this builder and returns a future Response.
-    ///
-    /// # Errors
-    ///
-    /// This method fails if there was an error while building the request, sending the request,
-    /// redirect loop was detected or redirect limit was exhausted.
-    ///
-    /// The method also errors if the request builder was not created from a client. The preferred
-    /// method is to create the builder without a client and use the [send_with](send_with) method.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// # use reqwest::Error;
-    /// #
-    /// # async fn run() -> Result<(), Error> {
-    /// let response = reqwest::Client::new()
-    ///     .get("https://hyper.rs")
-    ///     .send()
-    ///     .await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[deprecated(
-    note = "Use RequestBuilder::new instead to build without a client, and use the send_with method to specify the client during send"
-    )]
-    pub fn send(self) -> impl Future<Output=Result<Response, crate::Error>> {
-        // Cannot delegate to send_with because return types need to match
-        match (self.client, self.request) {
-            (Some(client), Ok(req)) => client.execute_request(req),
-            (None, _) => Pending::new_err(crate::error::builder(NoClientError)),
-            (_, Err(err)) => Pending::new_err(err),
-        }
-    }
-
-    /// Constructs the Request and sends it to the target URL using the specified client
-    /// and returns a future Response.
+    /// Constructs the Request and sends it to the target URL using the specified client and returns
+    /// a future Response.
     ///
     /// # Errors
     ///
@@ -115,12 +78,12 @@ impl RequestBuilder {
     /// #
     /// # async fn run() -> Result<(), Error> {
     /// let response = reqwest::RequestBuilder::get("https://hyper.rs")
-    ///     .send_with(&reqwest::Client::new())
+    ///     .send(&reqwest::Client::new())
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn send_with(self, client: &Client) -> impl Future<Output=Result<Response, crate::Error>> {
+    pub fn send(self, client: &Client) -> impl Future<Output=Result<Response, crate::Error>> {
         match self.request {
             Ok(req) => client.execute_request(req),
             Err(err) => Pending::new_err(err),
@@ -138,8 +101,7 @@ impl RequestBuilder {
     /// # use reqwest::Error;
     /// #
     /// # fn run() -> Result<(), Error> {
-    /// let client = reqwest::Client::new();
-    /// let builder = client.post("http://httpbin.org/post")
+    /// let builder = reqwest::blocking::RequestBuilder::post("http://httpbin.org/post")
     ///     .body("from a &str!");
     /// let clone = builder.try_clone();
     /// assert!(clone.is_some());
@@ -152,7 +114,6 @@ impl RequestBuilder {
             .ok()
             .and_then(|req| req.try_clone())
             .map(|req| RequestBuilder {
-                client: self.client.clone(),
                 request: Ok(req),
             })
     }

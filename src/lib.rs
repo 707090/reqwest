@@ -61,7 +61,7 @@
 //! # async fn run() -> Result<(), Error> {
 //! let res = reqwest::RequestBuilder::post("http://httpbin.org/post")
 //!     .body("the exact body that is sent")
-//!     .send_with(&reqwest::Client::new())
+//!     .send(&reqwest::Client::new())
 //!     .await?;
 //! # Ok(())
 //! # }
@@ -84,7 +84,7 @@
 //! let client = reqwest::Client::new();
 //! let res = reqwest::RequestBuilder::post("http://httpbin.org/post")
 //!     .form(&params)
-//!     .send_with(&client)
+//!     .send(&client)
 //!     .await?;
 //! # Ok(())
 //! # }
@@ -110,7 +110,7 @@
 //! let client = reqwest::Client::new();
 //! let res = reqwest::RequestBuilder::post("http://httpbin.org/post")
 //!     .json(&map)
-//!     .send_with(&client)
+//!     .send(&client)
 //!     .await?;
 //! # Ok(())
 //! # }
@@ -246,7 +246,7 @@ mod into_url;
 /// - there was an error while sending request
 /// - redirect limit was exhausted
 pub async fn get<T: IntoUrl>(url: T) -> crate::Result<Response> {
-    RequestBuilder::get(url).send_with(&Client::builder().build()?).await
+    RequestBuilder::get(url).send(&Client::builder().build()?).await
 }
 
 fn _assert_impls() {

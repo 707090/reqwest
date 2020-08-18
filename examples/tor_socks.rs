@@ -14,7 +14,7 @@ async fn main() -> Result<(), reqwest::Error> {
         .build()
         .expect("should be able to build reqwest client");
 
-    let res = RequestBuilder::get("https://check.torproject.org").send_with(&client).await?;
+    let res = RequestBuilder::get("https://check.torproject.org").send(&client).await?;
     println!("Status: {}", res.status());
 
     let text = res.text().await?;

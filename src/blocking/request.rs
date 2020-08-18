@@ -1,5 +1,4 @@
 use crate::async_impl;
-use crate::core::request::NoClientError;
 use crate::header::CONTENT_TYPE;
 
 use super::{
@@ -11,7 +10,7 @@ use super::{
 /// A request which can be executed with `Client::execute()`.
 pub type Request = crate::core::request::Request<super::Body>;
 /// A builder to construct the properties of a `Request`.
-pub type RequestBuilder = crate::core::request::RequestBuilder<Client, super::Body>;
+pub type RequestBuilder = crate::core::request::RequestBuilder<super::Body>;
 
 impl Request {
     /// Attempts to clone the `Request`.
@@ -79,7 +78,7 @@ impl RequestBuilder {
     ///
     /// let response = reqwest::blocking::RequestBuilder::post("your url")
     ///     .multipart(form)
-    ///     .send_with(&client)?;
+    ///     .send(&client)?;
     /// # Ok(())
     /// # }
     /// ```
@@ -98,6 +97,7 @@ impl RequestBuilder {
         }
         builder
     }
+
     /// Constructs the Request and sends it to the target URL using the client which created
     /// this builder and returns a Response.
     ///
@@ -115,40 +115,12 @@ impl RequestBuilder {
     /// # use reqwest::Error;
     /// #
     /// # fn run() -> Result<(), Error> {
-    /// let response = reqwest::blocking::Client::new()
-    ///     .get("https://hyper.rs")
-    ///     .send()?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[deprecated(
-    note = "Use RequestBuilder::new instead to build without a client, and use the send_with method to specify the client during send"
-    )]
-    pub fn send(self) -> crate::Result<super::Response> {
-        let client = self.client.ok_or(crate::error::builder(NoClientError))?;
-        client.execute(self.request?)
-    }
-
-    /// Constructs the Request and sends it to the target URL using the specified client
-    /// and returns a Response.
-    ///
-    /// # Errors
-    ///
-    /// This method fails if there was an error while building the request, sending the request,
-    /// redirect loop was detected or redirect limit was exhausted.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// # use reqwest::Error;
-    /// #
-    /// # fn run() -> Result<(), Error> {
     /// let response = reqwest::blocking::RequestBuilder::get("https://hyper.rs")
-    ///     .send_with(&reqwest::blocking::Client::new())?;
+    ///     .send(&reqwest::blocking::Client::new())?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn send_with(self, client: &Client) -> crate::Result<super::Response> {
+    pub fn send(self, client: &Client) -> crate::Result<super::Response> {
         client.execute(self.request?)
     }
 
@@ -199,7 +171,6 @@ impl RequestBuilder {
             .ok()
             .and_then(|req| req.try_clone())
             .map(|req| RequestBuilder {
-                client: self.client.clone(),
                 request: Ok(req),
             })
     }

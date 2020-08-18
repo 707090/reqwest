@@ -30,7 +30,7 @@ async fn main() -> Result<(), reqwest::Error> {
     };
     let new_post: Post = RequestBuilder::post("https://jsonplaceholder.typicode.com/posts")
         .json(&new_post)
-        .send_with(&reqwest::Client::new())
+        .send(&reqwest::Client::new())
         .await?
         .json()
         .await?;

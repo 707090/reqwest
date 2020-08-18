@@ -22,7 +22,7 @@ async fn http_proxy() {
         .build()
         .unwrap();
     let res = RequestBuilder::get(url)
-        .send_with(&client)
+        .send(&client)
         .await
         .unwrap();
 
@@ -56,7 +56,7 @@ async fn http_proxy_basic_auth() {
         .build()
         .unwrap();
     let res = RequestBuilder::get(url)
-        .send_with(&client)
+        .send(&client)
         .await
         .unwrap();
 
@@ -86,7 +86,7 @@ async fn http_proxy_basic_auth_parsed() {
         .build()
         .unwrap();
     let res = RequestBuilder::get(url)
-        .send_with(&client)
+        .send(&client)
         .await
         .unwrap();
 
@@ -112,7 +112,7 @@ async fn test_no_proxy() {
         .unwrap();
     // set up proxy and use no_proxy to clear up client builder proxies.
     let res = RequestBuilder::get(&url)
-        .send_with(&client)
+        .send(&client)
         .await
         .unwrap();
 
@@ -172,7 +172,7 @@ async fn http_over_http() {
         .build()
         .unwrap();
     let res = RequestBuilder::get(url)
-        .send_with(&client)
+        .send(&client)
         .await
         .unwrap();
 

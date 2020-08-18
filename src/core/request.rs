@@ -130,12 +130,11 @@ where
 }
 
 /// A builder to construct the properties of a `Request`.
-pub struct RequestBuilder<Client, Body> {
-    pub(crate) client: Option<Client>,
+pub struct RequestBuilder<Body> {
     pub(crate) request: crate::Result<Request<Body>>,
 }
 
-impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
+impl<Body: From<Vec<u8>> + From<String>> RequestBuilder<Body> {
     /// Start building a `Request` with the `Method` and `Url`.
     ///
     /// Returns a `RequestBuilder`, which will allow setting headers and
@@ -144,10 +143,9 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// # Errors
     ///
     /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn new<U: IntoUrl>(method: Method, url: U) -> RequestBuilder<Client, Body> {
+    pub fn new<U: IntoUrl>(method: Method, url: U) -> RequestBuilder<Body> {
         let request = url.into_url().map(move |url| Request::new(method, url));
         let mut builder = RequestBuilder {
-            client: None,
             request,
         };
 
@@ -169,7 +167,7 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// # Errors
     ///
     /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn get<U: IntoUrl>(url: U) -> RequestBuilder<Client, Body> {
+    pub fn get<U: IntoUrl>(url: U) -> RequestBuilder<Body> {
         RequestBuilder::new(Method::GET, url)
     }
 
@@ -178,7 +176,7 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// # Errors
     ///
     /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn post<U: IntoUrl>(url: U) -> RequestBuilder<Client, Body> {
+    pub fn post<U: IntoUrl>(url: U) -> RequestBuilder<Body> {
         RequestBuilder::new(Method::POST, url)
     }
 
@@ -187,7 +185,7 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// # Errors
     ///
     /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn put<U: IntoUrl>(url: U) -> RequestBuilder<Client, Body> {
+    pub fn put<U: IntoUrl>(url: U) -> RequestBuilder<Body> {
         RequestBuilder::new(Method::PUT, url)
     }
 
@@ -196,7 +194,7 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// # Errors
     ///
     /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn patch<U: IntoUrl>(url: U) -> RequestBuilder<Client, Body> {
+    pub fn patch<U: IntoUrl>(url: U) -> RequestBuilder<Body> {
         RequestBuilder::new(Method::PATCH, url)
     }
 
@@ -205,7 +203,7 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// # Errors
     ///
     /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn delete<U: IntoUrl>(url: U) -> RequestBuilder<Client, Body> {
+    pub fn delete<U: IntoUrl>(url: U) -> RequestBuilder<Body> {
         RequestBuilder::new(Method::DELETE, url)
     }
 
@@ -214,7 +212,7 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// # Errors
     ///
     /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn head<U: IntoUrl>(url: U) -> RequestBuilder<Client, Body> {
+    pub fn head<U: IntoUrl>(url: U) -> RequestBuilder<Body> {
         RequestBuilder::new(Method::HEAD, url)
     }
 
@@ -227,14 +225,14 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// #
     /// # async fn run() -> Result<(), Error> {
     /// let client = reqwest::Client::new();
-    /// let res = client.get("https://www.rust-lang.org")
+    /// let res = reqwest::RequestBuilder::get("https://www.rust-lang.org")
     ///     .header(USER_AGENT, "foo")
-    ///     .send()
+    ///     .send(&client)
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn header<K, V>(self, key: K, value: V) -> RequestBuilder<Client, Body>
+    pub fn header<K, V>(self, key: K, value: V) -> RequestBuilder<Body>
     where
         HeaderName: TryFrom<K>,
         <HeaderName as TryFrom<K>>::Error: Into<http::Error>,
@@ -250,7 +248,7 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
         key: K,
         value: V,
         sensitive: bool,
-    ) -> RequestBuilder<Client, Body>
+    ) -> RequestBuilder<Body>
     where
         HeaderName: TryFrom<K>,
         <HeaderName as TryFrom<K>>::Error: Into<http::Error>,
@@ -304,7 +302,7 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     // # Ok(())
     // # }
     // ```
-    pub fn headers(mut self, headers: crate::header::HeaderMap) -> RequestBuilder<Client, Body> {
+    pub fn headers(mut self, headers: crate::header::HeaderMap) -> RequestBuilder<Body> {
         if let Ok(ref mut req) = self.request {
             crate::util::replace_headers(req.headers_mut(), headers);
         }
@@ -318,14 +316,14 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// #
     /// # async fn run() -> Result<(), Error> {
     /// let client = reqwest::Client::new();
-    /// let resp = client.delete("http://httpbin.org/delete")
+    /// let resp = reqwest::RequestBuilder::delete("http://httpbin.org/delete")
     ///     .basic_auth("admin", Some("good password"))
-    ///     .send()
+    ///     .send(&client)
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn basic_auth<U, P>(self, username: U, password: Option<P>) -> RequestBuilder<Client, Body>
+    pub fn basic_auth<U, P>(self, username: U, password: Option<P>) -> RequestBuilder<Body>
     where
         U: std::fmt::Display,
         P: std::fmt::Display,
@@ -345,14 +343,14 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// #
     /// # async fn run() -> Result<(), Error> {
     /// let client = reqwest::Client::new();
-    /// let resp = client.delete("http://httpbin.org/delete")
+    /// let resp = reqwest::RequestBuilder::delete("http://httpbin.org/delete")
     ///     .bearer_auth("token")
-    ///     .send()
+    ///     .send(&client)
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn bearer_auth<T>(self, token: T) -> RequestBuilder<Client, Body>
+    pub fn bearer_auth<T>(self, token: T) -> RequestBuilder<Body>
     where
         T: std::fmt::Display,
     {
@@ -371,9 +369,9 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// #
     /// # async fn run() -> Result<(), Error> {
     /// let client = reqwest::Client::new();
-    /// let res = client.post("http://httpbin.org/post")
+    /// let res = reqwest::RequestBuilder::post("http://httpbin.org/post")
     ///     .body("from a &str!")
-    ///     .send()
+    ///     .send(&client)
     ///     .await?;
     /// # Ok(())
     /// # }
@@ -405,14 +403,14 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// // from bytes!
     /// let bytes: Vec<u8> = vec![1, 10, 100];
     /// let client = reqwest::Client::new();
-    /// let res = client.post("http://httpbin.org/post")
+    /// let res = reqwest::RequestBuilder::post("http://httpbin.org/post")
     ///     .body(bytes)
-    ///     .send()
+    ///     .send(&client)
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn body<T: Into<Body>>(mut self, body: T) -> RequestBuilder<Client, Body> {
+    pub fn body<T: Into<Body>>(mut self, body: T) -> RequestBuilder<Body> {
         if let Ok(ref mut req) = self.request {
             *req.body_mut() = Some(body.into());
         }
@@ -424,7 +422,7 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// The timeout is applied from the when the request starts connecting
     /// until the response body has finished. It affects only this request
     /// and overrides the timeout configured using `ClientBuilder::timeout()`.
-    pub fn timeout(mut self, timeout: Duration) -> RequestBuilder<Client, Body> {
+    pub fn timeout(mut self, timeout: Duration) -> RequestBuilder<Body> {
         if let Ok(ref mut req) = self.request {
             *req.timeout_mut() = Some(timeout);
         }
@@ -445,9 +443,9 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// #
     /// # async fn run() -> Result<(), Error> {
     /// let client = reqwest::Client::new();
-    /// let res = client.get("http://httpbin.org")
+    /// let res = reqwest::RequestBuilder::get("http://httpbin.org")
     ///     .query(&[("lang", "rust")])
-    ///     .send()
+    ///     .send(&client)
     ///     .await?;
     /// # Ok(())
     /// # }
@@ -462,7 +460,7 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// # Errors
     /// This method will fail if the object you provide cannot be serialized
     /// into a query string.
-    pub fn query<T: Serialize + ?Sized>(mut self, query: &T) -> RequestBuilder<Client, Body> {
+    pub fn query<T: Serialize + ?Sized>(mut self, query: &T) -> RequestBuilder<Body> {
         let mut error = None;
         if let Ok(ref mut req) = self.request {
             let url = req.url_mut();
@@ -499,9 +497,9 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// params.insert("lang", "rust");
     ///
     /// let client = reqwest::Client::new();
-    /// let res = client.post("http://httpbin.org")
+    /// let res = reqwest::RequestBuilder::post("http://httpbin.org")
     ///     .form(&params)
-    ///     .send()
+    ///     .send(&client)
     ///     .await?;
     /// # Ok(())
     /// # }
@@ -511,7 +509,7 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     ///
     /// This method fails if the passed value cannot be serialized into
     /// url encoded format
-    pub fn form<T: Serialize + ?Sized>(mut self, form: &T) -> RequestBuilder<Client, Body> {
+    pub fn form<T: Serialize + ?Sized>(mut self, form: &T) -> RequestBuilder<Body> {
         let mut error = None;
         if let Ok(ref mut req) = self.request {
             match serde_urlencoded::to_string(form) {
@@ -551,9 +549,9 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// map.insert("lang", "rust");
     ///
     /// let client = reqwest::Client::new();
-    /// let res = client.post("http://httpbin.org")
+    /// let res = reqwest::RequestBuilder::post("http://httpbin.org")
     ///     .json(&map)
-    ///     .send()
+    ///     .send(&client)
     ///     .await?;
     /// # Ok(())
     /// # }
@@ -564,7 +562,7 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// Serialization can fail if `T`'s implementation of `Serialize` decides to
     /// fail, or if `T` contains a map with non-string keys.
     #[cfg(feature = "json")]
-    pub fn json<T: Serialize + ?Sized>(mut self, json: &T) -> RequestBuilder<Client, Body> {
+    pub fn json<T: Serialize + ?Sized>(mut self, json: &T) -> RequestBuilder<Body> {
         let mut error = None;
         if let Ok(ref mut req) = self.request {
             match serde_json::to_vec(json) {
@@ -591,7 +589,7 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     /// The [request mode][mdn] will be set to 'no-cors'.
     ///
     /// [mdn]: https://developer.mozilla.org/en-US/docs/Web/API/Request/mode
-    pub fn fetch_mode_no_cors(mut self) -> RequestBuilder<Client, Body> {
+    pub fn fetch_mode_no_cors(mut self) -> RequestBuilder<Body> {
         if let Ok(ref mut req) = self.request {
             req.cors = false;
         }
@@ -605,7 +603,7 @@ impl<Client, Body: From<Vec<u8>> + From<String>> RequestBuilder<Client, Body> {
     }
 }
 
-impl<Client, Body> std::fmt::Debug for RequestBuilder<Client, Body> {
+impl<Body> std::fmt::Debug for RequestBuilder<Body> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut builder = f.debug_struct("RequestBuilder");
         match self.request {
@@ -623,17 +621,6 @@ fn fmt_request_fields<'a, 'b, Body>(
         .field("url", &req.url)
         .field("headers", &req.headers)
 }
-
-#[derive(Debug)]
-pub(crate) struct NoClientError;
-
-impl std::fmt::Display for NoClientError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str("Cannot send request without a client. Use the `send_with` method if the request builder was created from scratch (preferred)")
-    }
-}
-
-impl std::error::Error for NoClientError {}
 
 /// Check the request URL for a "username:password" type authority, and if
 /// found, remove it from the URL and return it.

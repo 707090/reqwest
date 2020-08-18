@@ -17,7 +17,7 @@ async fn main() -> Result<(), reqwest::Error> {
             "body": "https://docs.rs/reqwest",
             "userId": 1
         }))
-        .send_with(&reqwest::Client::new())
+        .send(&reqwest::Client::new())
         .await?
         .json()
         .await?;

@@ -48,7 +48,7 @@ async fn user_agent() {
         .build()
         .expect("client builder");
     let res = RequestBuilder::get(&url)
-        .send_with(&client)
+        .send(&client)
         .await
         .expect("request");
 
@@ -64,7 +64,7 @@ async fn response_text() {
     let client = Client::new();
 
     let res = RequestBuilder::get(&format!("http://{}/text", server.addr()))
-        .send_with(&client)
+        .send(&client)
         .await
         .expect("Failed to get");
     assert_eq!(res.content_length(), Some(5));
@@ -81,7 +81,7 @@ async fn response_bytes() {
     let client = Client::new();
 
     let res = RequestBuilder::get(&format!("http://{}/bytes", server.addr()))
-        .send_with(&client)
+        .send(&client)
         .await
         .expect("Failed to get");
     assert_eq!(res.content_length(), Some(5));
@@ -99,7 +99,7 @@ async fn response_json() {
     let client = Client::new();
 
     let res = RequestBuilder::get(&format!("http://{}/json", server.addr()))
-        .send_with(&client)
+        .send(&client)
         .await
         .expect("Failed to get");
     let text = res.json::<String>().await.expect("Failed to get json");
@@ -131,7 +131,7 @@ async fn body_pipe_response() {
     let client = Client::new();
 
     let res1 = RequestBuilder::get(&format!("http://{}/get", server.addr()))
-        .send_with(&client)
+        .send(&client)
         .await
         .expect("get1");
 
@@ -141,7 +141,7 @@ async fn body_pipe_response() {
     // and now ensure we can "pipe" the response to another request
     let res2 = RequestBuilder::post(&format!("http://{}/pipe", server.addr()))
         .body(res1)
-        .send_with(&client)
+        .send(&client)
         .await
         .expect("res2");
 

@@ -2,7 +2,7 @@
 async fn main() {
     reqwest::RequestBuilder::post("http://www.baidu.com")
         .form(&[("one", "1")])
-        .send_with(&reqwest::Client::new())
+        .send(&reqwest::Client::new())
         .await
         .unwrap();
 }

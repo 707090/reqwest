@@ -46,7 +46,7 @@
 //! # fn run() -> Result<(), Error> {
 //! let res = reqwest::blocking::RequestBuilder::post("http://httpbin.org/post")
 //!     .body("the exact body that is sent")
-//!     .send_with(&reqwest::blocking::Client::new())?;
+//!     .send(&reqwest::blocking::Client::new())?;
 //! # Ok(())
 //! # }
 //! ```
@@ -95,5 +95,5 @@ pub use self::response::Response;
 /// - redirect loop was detected
 /// - redirect limit was exhausted
 pub fn get<T: crate::IntoUrl>(url: T) -> crate::Result<Response> {
-    RequestBuilder::get(url).send_with(&Client::builder().build()?)
+    RequestBuilder::get(url).send(&Client::builder().build()?)
 }

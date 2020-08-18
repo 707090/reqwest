@@ -26,7 +26,7 @@ async fn cookie_response_accessor() {
     let client = reqwest::Client::new();
 
     let url = format!("http://{}/", server.addr());
-    let res = RequestBuilder::get(&url).send_with(&client).await.unwrap();
+    let res = RequestBuilder::get(&url).send(&client).await.unwrap();
 
     let cookies = res.cookies().collect::<Vec<_>>();
 
@@ -91,10 +91,10 @@ async fn cookie_store_simple() {
         .unwrap();
 
     let url = format!("http://{}/", server.addr());
-    RequestBuilder::get(&url).send_with(&client).await.unwrap();
+    RequestBuilder::get(&url).send(&client).await.unwrap();
 
     let url = format!("http://{}/2", server.addr());
-    RequestBuilder::get(&url).send_with(&client).await.unwrap();
+    RequestBuilder::get(&url).send(&client).await.unwrap();
 }
 
 #[tokio::test]
@@ -124,13 +124,13 @@ async fn cookie_store_overwrite_existing() {
         .unwrap();
 
     let url = format!("http://{}/", server.addr());
-    RequestBuilder::get(&url).send_with(&client).await.unwrap();
+    RequestBuilder::get(&url).send(&client).await.unwrap();
 
     let url = format!("http://{}/2", server.addr());
-    RequestBuilder::get(&url).send_with(&client).await.unwrap();
+    RequestBuilder::get(&url).send(&client).await.unwrap();
 
     let url = format!("http://{}/3", server.addr());
-    RequestBuilder::get(&url).send_with(&client).await.unwrap();
+    RequestBuilder::get(&url).send(&client).await.unwrap();
 }
 
 #[tokio::test]
@@ -148,8 +148,8 @@ async fn cookie_store_max_age() {
         .build()
         .unwrap();
     let url = format!("http://{}/", server.addr());
-    RequestBuilder::get(&url).send_with(&client).await.unwrap();
-    RequestBuilder::get(&url).send_with(&client).await.unwrap();
+    RequestBuilder::get(&url).send(&client).await.unwrap();
+    RequestBuilder::get(&url).send(&client).await.unwrap();
 }
 
 #[tokio::test]
@@ -171,8 +171,8 @@ async fn cookie_store_expires() {
         .unwrap();
 
     let url = format!("http://{}/", server.addr());
-    RequestBuilder::get(&url).send_with(&client).await.unwrap();
-    RequestBuilder::get(&url).send_with(&client).await.unwrap();
+    RequestBuilder::get(&url).send(&client).await.unwrap();
+    RequestBuilder::get(&url).send(&client).await.unwrap();
 }
 
 #[tokio::test]
@@ -197,9 +197,9 @@ async fn cookie_store_path() {
         .unwrap();
 
     let url = format!("http://{}/", server.addr());
-    RequestBuilder::get(&url).send_with(&client).await.unwrap();
-    RequestBuilder::get(&url).send_with(&client).await.unwrap();
+    RequestBuilder::get(&url).send(&client).await.unwrap();
+    RequestBuilder::get(&url).send(&client).await.unwrap();
 
     let url = format!("http://{}/subpath", server.addr());
-    RequestBuilder::get(&url).send_with(&client).await.unwrap();
+    RequestBuilder::get(&url).send(&client).await.unwrap();
 }

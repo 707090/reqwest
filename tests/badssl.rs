@@ -21,7 +21,7 @@ async fn test_rustls_badssl_modern() {
         .build()
         .unwrap();
     let text = RequestBuilder::get("https://mozilla-modern.badssl.com/")
-        .send_with(&client)
+        .send(&client)
         .await
         .unwrap()
         .text()
@@ -39,7 +39,7 @@ async fn test_badssl_self_signed() {
         .build()
         .unwrap();
     let text = RequestBuilder::get("https://self-signed.badssl.com/")
-        .send_with(&client)
+        .send(&client)
         .await
         .unwrap()
         .text()
@@ -57,7 +57,7 @@ async fn test_badssl_wrong_host() {
         .build()
         .unwrap();
     let text = RequestBuilder::get("https://wrong.host.badssl.com/")
-        .send_with(&client)
+        .send(&client)
         .await
         .unwrap()
         .text()
@@ -67,7 +67,7 @@ async fn test_badssl_wrong_host() {
     assert!(text.contains("<title>wrong.host.badssl.com</title>"));
 
     let result = RequestBuilder::get("https://self-signed.badssl.com/")
-        .send_with(&client)
+        .send(&client)
         .await;
 
     assert!(result.is_err());

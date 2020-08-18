@@ -1,12 +1,9 @@
-#![allow(deprecated)]
-use http::Method;
 use std::future::Future;
 use wasm_bindgen::prelude::{wasm_bindgen, UnwrapThrowExt as _};
 use js_sys::Promise;
 use url::Url;
 
-use super::{Request, RequestBuilder, Response};
-use crate::IntoUrl;
+use super::{Request, Response};
 
 #[wasm_bindgen]
 extern "C" {
@@ -31,95 +28,6 @@ impl Client {
     /// dox
     pub fn builder() -> ClientBuilder {
         ClientBuilder::new()
-    }
-
-    /// Convenience method to make a `GET` request to a URL.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    #[deprecated(
-        note: "Use RequestBuilder::get instead to build without a client, and use the send_with method to specify the client during send"
-    )]
-    pub fn get<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.request(Method::GET, url)
-    }
-
-    /// Convenience method to make a `POST` request to a URL.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    #[deprecated(
-        note: "Use RequestBuilder::post instead to build without a client, and use the send_with method to specify the client during send"
-    )]
-    pub fn post<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.request(Method::POST, url)
-    }
-
-    /// Convenience method to make a `PUT` request to a URL.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    #[deprecated(
-        note: "Use RequestBuilder::put instead to build without a client, and use the send_with method to specify the client during send"
-    )]
-    pub fn put<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.request(Method::PUT, url)
-    }
-
-    /// Convenience method to make a `PATCH` request to a URL.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    #[deprecated(
-        note: "Use RequestBuilder::patch instead to build without a client, and use the send_with method to specify the client during send"
-    )]
-    pub fn patch<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.request(Method::PATCH, url)
-    }
-
-    /// Convenience method to make a `DELETE` request to a URL.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    #[deprecated(
-        note: "Use RequestBuilder::delete instead to build without a client, and use the send_with method to specify the client during send"
-    )]
-    pub fn delete<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.request(Method::DELETE, url)
-    }
-
-    /// Convenience method to make a `HEAD` request to a URL.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    #[deprecated(
-        note: "Use RequestBuilder::head instead to build without a client, and use the send_with method to specify the client during send"
-    )]
-    pub fn head<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.request(Method::HEAD, url)
-    }
-
-    /// Start building a `Request` with the `Method` and `Url`.
-    ///
-    /// Returns a `RequestBuilder`, which will allow setting headers and
-    /// request body before sending.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    #[deprecated(
-        note: "Use RequestBuilder::new instead to build without a client, and use the send_with method to specify the client during send"
-    )]
-    pub fn request<U: IntoUrl>(&self, method: Method, url: U) -> RequestBuilder {
-        let mut builder = RequestBuilder::new(method, url);
-        builder.client = Some(self.clone());
-        builder
     }
 
     /// Executes a `Request`.

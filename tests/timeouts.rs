@@ -23,7 +23,7 @@ async fn client_timeout() {
 
     let url = format!("http://{}/slow", server.addr());
 
-    let res = RequestBuilder::get(&url).send_with(&client).await;
+    let res = RequestBuilder::get(&url).send(&client).await;
 
     let err = res.unwrap_err();
 
@@ -49,7 +49,7 @@ async fn request_timeout() {
 
     let res = RequestBuilder::get(&url)
         .timeout(Duration::from_millis(500))
-        .send_with(&client)
+        .send(&client)
         .await;
 
     let err = res.unwrap_err();
@@ -80,7 +80,7 @@ async fn response_timeout() {
         .unwrap();
 
     let url = format!("http://{}/slow", server.addr());
-    let res = RequestBuilder::get(&url).send_with(&client).await.expect("Failed to get");
+    let res = RequestBuilder::get(&url).send(&client).await.expect("Failed to get");
     let body = res.text().await;
 
     let err = body.unwrap_err();
@@ -111,7 +111,7 @@ fn timeout_closes_connection() {
     });
 
     let url = format!("http://{}/closes", server.addr());
-    let err = reqwest::blocking::RequestBuilder::get(&url).send_with(&client).unwrap_err();
+    let err = reqwest::blocking::RequestBuilder::get(&url).send(&client).unwrap_err();
 
     assert!(err.is_timeout());
     assert_eq!(err.url().map(|u| u.as_str()), Some(url.as_str()));
@@ -137,7 +137,7 @@ fn timeout_blocking_request() {
     let url = format!("http://{}/closes", server.addr());
     let err = reqwest::blocking::RequestBuilder::get(&url)
         .timeout(Duration::from_millis(500))
-        .send_with(&client)
+        .send(&client)
         .unwrap_err();
 
     assert!(err.is_timeout());
@@ -170,7 +170,7 @@ fn write_timeout_large_body() {
     let url = format!("http://{}/write-timeout", server.addr());
     let err = reqwest::blocking::RequestBuilder::post(&url)
         .body(reqwest::blocking::Body::sized(cursor, len as u64))
-        .send_with(&client)
+        .send(&client)
         .unwrap_err();
 
     assert!(err.is_timeout());
