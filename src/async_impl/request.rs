@@ -9,23 +9,6 @@ pub type Request = crate::core::request::Request<super::Body>;
 /// A builder to construct the properties of a `Request`.
 pub type RequestBuilder = crate::core::request::RequestBuilder<super::Body>;
 
-impl Request {
-    /// Attempt to clone the request.
-    ///
-    /// `None` is returned if the request can not be cloned, i.e. if the body is a stream.
-    pub fn try_clone(&self) -> Option<Request> {
-        let body = match self.body.as_ref() {
-            Some(ref body) => Some(body.try_clone()?),
-            None => None,
-        };
-        let mut req = Request::new(self.method().clone(), self.url().clone());
-        *req.timeout_mut() = self.timeout().cloned();
-        *req.headers_mut() = self.headers().clone();
-        req.body = body;
-        Some(req)
-    }
-}
-
 impl RequestBuilder {
     /// Sends a multipart/form-data body.
     ///
@@ -89,34 +72,6 @@ impl RequestBuilder {
             Err(err) => Pending::new_err(err),
         }
     }
-
-    /// Attempt to clone the RequestBuilder.
-    ///
-    /// `None` is returned if the RequestBuilder can not be cloned,
-    /// i.e. if the request body is a stream.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use reqwest::Error;
-    /// #
-    /// # fn run() -> Result<(), Error> {
-    /// let builder = reqwest::blocking::RequestBuilder::post("http://httpbin.org/post")
-    ///     .body("from a &str!");
-    /// let clone = builder.try_clone();
-    /// assert!(clone.is_some());
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn try_clone(&self) -> Option<RequestBuilder> {
-        self.request
-            .as_ref()
-            .ok()
-            .and_then(|req| req.try_clone())
-            .map(|req| RequestBuilder {
-                request: Ok(req),
-            })
-    }
 }
 
 #[cfg(test)]
@@ -124,6 +79,7 @@ mod tests {
     use std::collections::BTreeMap;
     use std::convert::TryFrom;
 
+    use fallible::TryClone;
     use http::Request as HttpRequest;
     use serde::Serialize;
 
@@ -263,7 +219,7 @@ mod tests {
         let builder = RequestBuilder::get("http://httpbin.org/get")
             .body(super::super::Body::wrap_stream(stream));
         let clone = builder.try_clone();
-        assert!(clone.is_none());
+        assert!(clone.is_err());
     }
 
     #[test]
