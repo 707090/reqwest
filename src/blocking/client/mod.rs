@@ -50,7 +50,8 @@ mod runtime;
 /// ```
 #[derive(Clone)]
 pub struct Client {
-	inner: ClientHandle,
+	timeout: Timeout,
+	client_runtime: Arc<ClientRuntime>,
 }
 
 /// A `ClientBuilder` can be used to create a `Client` with  custom configuration.
@@ -96,7 +97,7 @@ impl ClientBuilder {
 	/// This method fails if TLS backend cannot be initialized, or the resolver
 	/// cannot load the system configuration.
 	pub fn build(self) -> crate::Result<Client> {
-		ClientHandle::new(self).map(|handle| Client { inner: handle })
+		Client::from_builder(self)
 	}
 
 
@@ -564,6 +565,13 @@ impl Default for Client {
 }
 
 impl Client {
+	fn from_builder(builder: ClientBuilder) -> crate::Result<Client> {
+		Ok(Client {
+			timeout: builder.timeout,
+			client_runtime: ClientRuntime::new(builder.inner.build()?).map(Arc::new)?,
+		})
+	}
+
 	/// Constructs a new `Client`.
 	///
 	/// # Panic
@@ -597,43 +605,8 @@ impl Client {
 	/// This method fails if there was an error while sending request,
 	/// or redirect limit was exhausted.
 	pub fn execute(&self, request: Request) -> crate::Result<Response> {
-		self.inner.execute_request(request)
-	}
-}
-
-impl fmt::Debug for Client {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		f.debug_struct("Client")
-			//.field("gzip", &self.inner.gzip)
-			//.field("redirect_policy", &self.inner.redirect_policy)
-			//.field("referer", &self.inner.referer)
-			.finish()
-	}
-}
-
-impl fmt::Debug for ClientBuilder {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.inner.fmt(f)
-	}
-}
-
-#[derive(Clone)]
-struct ClientHandle {
-	timeout: Timeout,
-	client_runtime: Arc<ClientRuntime>,
-}
-
-impl ClientHandle {
-	fn new(builder: ClientBuilder) -> crate::Result<ClientHandle> {
-		Ok(ClientHandle {
-			timeout: builder.timeout,
-			client_runtime: ClientRuntime::new(builder.inner.build()?).map(Arc::new)?,
-		})
-	}
-
-	fn execute_request(&self, req: Request) -> crate::Result<Response> {
 		let (tx, rx) = oneshot::channel();
-		let (req, body) = req.into_async();
+		let (req, body) = request.into_async();
 		let url = req.url().clone();
 		let timeout = req.timeout().copied().or(self.timeout.0);
 
@@ -652,16 +625,28 @@ impl ClientHandle {
 		};
 
 		executor::execute_blocking_flatten_timeout(
-				send_future,
-				timeout,
-				|timeout_err| crate::error::request(timeout_err).with_url(url.clone())
-			)
+			send_future,
+			timeout,
+			|timeout_err| crate::error::request(timeout_err).with_url(url.clone())
+		)
 			.map(|response| Response::new(
 				response,
 				self.timeout.0,
 				KeepCoreThreadAlive(Some(self.client_runtime.clone())),
 			))
 			.map_err(|response_error| response_error.with_url(url.clone()))
+	}
+}
+
+impl fmt::Debug for Client {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		f.debug_struct("Client").finish()
+	}
+}
+
+impl fmt::Debug for ClientBuilder {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		self.inner.fmt(f)
 	}
 }
 
