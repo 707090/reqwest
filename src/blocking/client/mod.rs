@@ -7,23 +7,24 @@ feature = "rustls-tls",
 use std::any::Any;
 use std::convert::TryInto;
 use std::fmt;
-use std::future::Future;
 use std::net::IpAddr;
 use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
 
 use http::header::HeaderValue;
-use log::{error, trace};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot;
+
+use runtime::ClientRuntime;
 
 use crate::{async_impl, header, Proxy, redirect};
 #[cfg(feature = "__tls")]
 use crate::{Certificate, Identity};
 
+use super::executor;
 use super::request::Request;
 use super::response::Response;
-use super::executor;
+
+mod runtime;
 
 /// A `Client` to make Requests with.
 ///
@@ -619,100 +620,14 @@ impl fmt::Debug for ClientBuilder {
 #[derive(Clone)]
 struct ClientHandle {
 	timeout: Timeout,
-	inner: Arc<InnerClientHandle>,
-}
-
-type OneshotResponse = oneshot::Sender<crate::Result<async_impl::Response>>;
-type ThreadSender = mpsc::UnboundedSender<(async_impl::Request, OneshotResponse)>;
-
-struct InnerClientHandle {
-	tx: Option<ThreadSender>,
-	thread: Option<thread::JoinHandle<()>>,
-}
-
-impl Drop for InnerClientHandle {
-	fn drop(&mut self) {
-		let id = self.thread
-			.as_ref()
-			.map(|h| h.thread().id())
-			.expect("thread not dropped yet");
-
-		trace!("closing runtime thread ({:?})", id);
-		self.tx.take();
-		trace!("signaled close for runtime thread ({:?})", id);
-		self.thread.take().map(|h| h.join());
-		trace!("closed runtime thread ({:?})", id);
-	}
+	client_runtime: Arc<ClientRuntime>,
 }
 
 impl ClientHandle {
 	fn new(builder: ClientBuilder) -> crate::Result<ClientHandle> {
-		let timeout = builder.timeout;
-		let builder = builder.inner;
-		let (tx, rx) = mpsc::unbounded_channel::<(async_impl::Request, OneshotResponse)>();
-		let (spawn_tx, spawn_rx) = oneshot::channel::<crate::Result<()>>();
-		let handle = thread::Builder::new()
-			.name("reqwest-internal-sync-runtime".into())
-			.spawn(move || {
-				use tokio::runtime;
-				let mut rt = match runtime::Builder::new().basic_scheduler().enable_all().build().map_err(crate::error::builder) {
-					Err(e) => {
-						if let Err(e) = spawn_tx.send(Err(e)) {
-							error!("Failed to communicate runtime creation failure: {:?}", e);
-						}
-						return;
-					}
-					Ok(v) => v,
-				};
-
-				let f = async move {
-					let client = match builder.build() {
-						Err(e) => {
-							if let Err(e) = spawn_tx.send(Err(e)) {
-								error!("Failed to communicate client creation failure: {:?}", e);
-							}
-							return;
-						}
-						Ok(v) => v,
-					};
-					if let Err(e) = spawn_tx.send(Ok(())) {
-						error!("Failed to communicate successful startup: {:?}", e);
-						return;
-					}
-
-					let mut rx = rx;
-
-					while let Some((req, req_tx)) = rx.recv().await {
-						let req_fut = client.execute(req);
-						tokio::spawn(forward(req_fut, req_tx));
-					}
-
-					trace!("({:?}) Receiver is shutdown", thread::current().id());
-				};
-
-				trace!("({:?}) start runtime::block_on", thread::current().id());
-				rt.block_on(f);
-				trace!("({:?}) end runtime::block_on", thread::current().id());
-				drop(rt);
-				trace!("({:?}) finished", thread::current().id());
-			})
-			.map_err(crate::error::builder)?;
-
-		// Wait for the runtime thread to start up...
-		match executor::execute_blocking(spawn_rx) {
-			Ok(Ok(_)) => (),
-			Ok(Err(err)) => return Err(err),
-			Err(_cancelled) => event_loop_panicked(),
-		}
-
-		let inner_handle = Arc::new(InnerClientHandle {
-			tx: Some(tx),
-			thread: Some(handle),
-		});
-
 		Ok(ClientHandle {
-			timeout,
-			inner: inner_handle,
+			timeout: builder.timeout,
+			client_runtime: ClientRuntime::new(builder.inner.build()?).map(Arc::new)?,
 		})
 	}
 
@@ -722,8 +637,8 @@ impl ClientHandle {
 		let url = req.url().clone();
 		let timeout = req.timeout().copied().or(self.timeout.0);
 
-		self.inner
-			.tx
+		self.client_runtime
+			.task_queue_sender
 			.as_ref()
 			.expect("core thread exited early")
 			.send((req, tx))
@@ -744,37 +659,10 @@ impl ClientHandle {
 			.map(|response| Response::new(
 				response,
 				self.timeout.0,
-				KeepCoreThreadAlive(Some(self.inner.clone())),
+				KeepCoreThreadAlive(Some(self.client_runtime.clone())),
 			))
 			.map_err(|response_error| response_error.with_url(url.clone()))
 	}
-}
-
-async fn forward<F>(fut: F, mut tx: OneshotResponse)
-	where
-		F: Future<Output=crate::Result<async_impl::Response>>,
-{
-	use std::task::Poll;
-
-	futures_util::pin_mut!(fut);
-
-	// "select" on the sender being canceled, and the future completing
-	let res = futures_util::future::poll_fn(|cx| {
-		match fut.as_mut().poll(cx) {
-			Poll::Ready(val) => Poll::Ready(Some(val)),
-			Poll::Pending => {
-				// check if the callback is canceled
-				futures_core::ready!(tx.poll_closed(cx));
-				Poll::Ready(None)
-			}
-		}
-	})
-		.await;
-
-	if let Some(res) = res {
-		let _ = tx.send(res);
-	}
-	// else request is canceled
 }
 
 #[derive(Clone, Copy)]
@@ -787,7 +675,7 @@ impl Default for Timeout {
 	}
 }
 
-pub(crate) struct KeepCoreThreadAlive(Option<Arc<InnerClientHandle>>);
+pub(crate) struct KeepCoreThreadAlive(Option<Arc<ClientRuntime>>);
 
 impl KeepCoreThreadAlive {
 	pub(crate) fn empty() -> KeepCoreThreadAlive {
