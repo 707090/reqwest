@@ -43,24 +43,17 @@ impl ClientRuntime {
         let runtime_thread = thread::Builder::new()
             .name("reqwest-internal-sync-runtime".into())
             .spawn(move || {
-                macro_rules! get_or_return {
-                    ($expr_: expr) => {
-                        match $expr_ {
-                            Err(err) => {
-                                if let Err(send_err) = runtime_startup_indicator_tx.send(Err(err)) {
-                                    error!("Failed to communicate client creation failure: {:?}", send_err);
-                                }
-                                return;
-                            }
-                            Ok(value) => value
+                let mut tokio_runtime = match tokio::runtime::Builder::new().basic_scheduler().enable_all().build() {
+                    Err(err) => {
+                        if let Err(send_err) = runtime_startup_indicator_tx.send(Err(crate::error::builder(err))) {
+                            error!("Failed to communicate runtime creation failure: {:?}", send_err);
                         }
-                    }
-                }
-
-                let mut tokio_runtime = get_or_return!(tokio::runtime::Builder::new().basic_scheduler().enable_all().build().map_err(crate::error::builder));
-
-                if let Err(e) = runtime_startup_indicator_tx.send(Ok(())) {
-                    error!("Failed to communicate successful startup: {:?}", e);
+                        return;
+                    },
+                    Ok(value) => value,
+                };
+                if let Err(send_err) = runtime_startup_indicator_tx.send(Ok(())) {
+                    error!("Failed to communicate runtime creation success: {:?}", send_err);
                     return;
                 }
 
