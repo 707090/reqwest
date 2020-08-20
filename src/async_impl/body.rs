@@ -127,13 +127,11 @@ impl Body {
         }
     }
 
-    pub(crate) fn try_reuse(self) -> (Option<Bytes>, Self) {
-        let reuse = match self.inner {
+    pub(crate) fn try_reuse(&self) -> Option<Bytes> {
+        match self.inner {
             Inner::Reusable(ref chunk) => Some(chunk.clone()),
             Inner::Streaming { .. } => None,
-        };
-
-        (reuse, self)
+        }
     }
 
     pub(crate) fn into_stream(self) -> ImplStream {

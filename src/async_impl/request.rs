@@ -1,8 +1,10 @@
 use std::future::Future;
 
+use futures_util::future::ready;
+
 use crate::header::{CONTENT_LENGTH, CONTENT_TYPE};
 
-use super::{Client, client::Pending, multipart, response::Response};
+use super::{Client, client::future::WrapFuture, multipart, response::Response};
 
 /// A request which can be executed with `Client::execute()`.
 pub type Request = crate::core::request::Request<super::Body>;
@@ -68,8 +70,8 @@ impl RequestBuilder {
     /// ```
     pub fn send(self, client: &Client) -> impl Future<Output=Result<Response, crate::Error>> {
         match self.request {
-            Ok(req) => client.execute_request(req),
-            Err(err) => Pending::new_err(err),
+            Ok(req) => WrapFuture::new(client.execute_request(req)),
+            Err(err) => WrapFuture::new(ready(Err(err))),
         }
     }
 }
