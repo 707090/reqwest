@@ -257,7 +257,7 @@ async fn send_future(sender: Sender) -> Result<(), crate::Error> {
     use bytes::{BufMut, BytesMut};
     use std::cmp;
 
-    let con_len = sender.body.1;
+    let content_len = sender.body.1;
     let cap = cmp::min(sender.body.1.unwrap_or(8192), 8192);
     let mut written = 0;
     let mut buf = BytesMut::with_capacity(cap as usize);
@@ -266,7 +266,7 @@ async fn send_future(sender: Sender) -> Result<(), crate::Error> {
     let mut tx = Some(sender.tx);
 
     loop {
-        if Some(written) == con_len {
+        if Some(written) == content_len {
             // Written up to content-length, so stop.
             return Ok(());
         }
@@ -276,7 +276,7 @@ async fn send_future(sender: Sender) -> Result<(), crate::Error> {
         //
         // We need to know whether there is any data to send before
         // we check the transmission channel (with poll_ready below)
-        // because somestimes the receiver disappears as soon as is
+        // because sometimes the receiver disappears as soon as it
         // considers the data is completely transmitted, which may
         // be true.
         //
