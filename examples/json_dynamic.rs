@@ -11,16 +11,17 @@ use reqwest::RequestBuilder;
 // `tokio = { version = "0.2", features = ["macros"] }`
 #[tokio::main]
 async fn main() -> Result<(), reqwest::Error> {
-    let echo_json: serde_json::Value = RequestBuilder::post("https://jsonplaceholder.typicode.com/posts")
-        .json(&serde_json::json!({
-            "title": "Reqwest.rs",
-            "body": "https://docs.rs/reqwest",
-            "userId": 1
-        }))
-        .send(&reqwest::Client::new())
-        .await?
-        .json()
-        .await?;
+    let echo_json: serde_json::Value =
+        RequestBuilder::post("https://jsonplaceholder.typicode.com/posts")
+            .json(&serde_json::json!({
+                "title": "Reqwest.rs",
+                "body": "https://docs.rs/reqwest",
+                "userId": 1
+            }))
+            .send(&reqwest::Client::new())
+            .await?
+            .json()
+            .await?;
 
     println!("{:#?}", echo_json);
     // Object(

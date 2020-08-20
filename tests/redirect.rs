@@ -1,7 +1,7 @@
 mod support;
 use futures_util::stream::StreamExt;
-use support::*;
 use reqwest::RequestBuilder;
+use support::*;
 
 #[tokio::test]
 async fn test_redirect_301_and_302_and_303_changes_post_to_get() {
@@ -108,7 +108,11 @@ async fn test_redirect_307_and_308_tries_to_post_again() {
 
         let url = format!("http://{}/{}", redirect.addr(), code);
         let dst = format!("http://{}/{}", redirect.addr(), "dst");
-        let res = RequestBuilder::post(&url).body("Hello").send(&client).await.unwrap();
+        let res = RequestBuilder::post(&url)
+            .body("Hello")
+            .send(&client)
+            .await
+            .unwrap();
         assert_eq!(res.url().as_str(), dst);
         assert_eq!(res.status(), reqwest::StatusCode::OK);
         assert_eq!(
@@ -183,9 +187,7 @@ async fn test_redirect_removes_sensitive_headers() {
 
     tx.broadcast(Some(mid_server.addr())).unwrap();
 
-    let client = reqwest::Client::builder()
-        .build()
-        .unwrap();
+    let client = reqwest::Client::builder().build().unwrap();
     RequestBuilder::get(&format!("http://{}/sensitive", mid_server.addr()))
         .header(
             reqwest::header::COOKIE,
@@ -229,10 +231,7 @@ async fn test_redirect_policy_can_stop_redirects_without_an_error() {
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .unwrap();
-    let res = RequestBuilder::get(&url)
-        .send(&client)
-        .await
-        .unwrap();
+    let res = RequestBuilder::get(&url).send(&client).await.unwrap();
 
     assert_eq!(res.url().as_str(), url);
     assert_eq!(res.status(), reqwest::StatusCode::FOUND);
@@ -255,10 +254,7 @@ async fn test_referer_is_not_set_if_disabled() {
         }
     });
 
-    let client = reqwest::Client::builder()
-        .referer(false)
-        .build()
-        .unwrap();
+    let client = reqwest::Client::builder().referer(false).build().unwrap();
     RequestBuilder::get(&format!("http://{}/no-refer", server.addr()))
         .send(&client)
         .await

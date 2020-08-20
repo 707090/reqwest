@@ -185,7 +185,9 @@ fn test_default_headers() {
         .unwrap();
 
     let url = format!("http://{}/1", server.addr());
-    let res = reqwest::blocking::RequestBuilder::get(&url).send(&client).unwrap();
+    let res = reqwest::blocking::RequestBuilder::get(&url)
+        .send(&client)
+        .unwrap();
 
     assert_eq!(res.url().as_str(), &url);
     assert_eq!(res.status(), reqwest::StatusCode::OK);

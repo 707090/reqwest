@@ -5,8 +5,8 @@
 //! more code.
 
 // These require the `serde` dependency.
-use serde::{Deserialize, Serialize};
 use reqwest::RequestBuilder;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Post {

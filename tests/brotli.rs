@@ -1,7 +1,7 @@
 mod support;
+use reqwest::RequestBuilder;
 use std::io::Read;
 use support::*;
-use reqwest::RequestBuilder;
 
 #[tokio::test]
 async fn brotli_response() {

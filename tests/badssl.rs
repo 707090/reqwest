@@ -16,10 +16,7 @@ async fn test_badssl_modern() {
 #[cfg(feature = "rustls-tls")]
 #[tokio::test]
 async fn test_rustls_badssl_modern() {
-    let client = reqwest::Client::builder()
-        .use_rustls_tls()
-        .build()
-        .unwrap();
+    let client = reqwest::Client::builder().use_rustls_tls().build().unwrap();
     let text = RequestBuilder::get("https://mozilla-modern.badssl.com/")
         .send(&client)
         .await

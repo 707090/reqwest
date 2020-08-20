@@ -1,7 +1,7 @@
 mod support;
 use futures_util::stream::StreamExt;
-use support::*;
 use reqwest::RequestBuilder;
+use support::*;
 
 #[tokio::test]
 async fn text_part() {

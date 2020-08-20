@@ -1,8 +1,8 @@
 mod support;
 use support::*;
 
-use std::env;
 use reqwest::RequestBuilder;
+use std::env;
 
 #[tokio::test]
 async fn http_proxy() {
@@ -21,10 +21,7 @@ async fn http_proxy() {
         .proxy(reqwest::Proxy::http(&proxy).unwrap())
         .build()
         .unwrap();
-    let res = RequestBuilder::get(url)
-        .send(&client)
-        .await
-        .unwrap();
+    let res = RequestBuilder::get(url).send(&client).await.unwrap();
 
     assert_eq!(res.url().as_str(), url);
     assert_eq!(res.status(), reqwest::StatusCode::OK);
@@ -55,10 +52,7 @@ async fn http_proxy_basic_auth() {
         )
         .build()
         .unwrap();
-    let res = RequestBuilder::get(url)
-        .send(&client)
-        .await
-        .unwrap();
+    let res = RequestBuilder::get(url).send(&client).await.unwrap();
 
     assert_eq!(res.url().as_str(), url);
     assert_eq!(res.status(), reqwest::StatusCode::OK);
@@ -85,10 +79,7 @@ async fn http_proxy_basic_auth_parsed() {
         .proxy(reqwest::Proxy::http(&proxy).unwrap())
         .build()
         .unwrap();
-    let res = RequestBuilder::get(url)
-        .send(&client)
-        .await
-        .unwrap();
+    let res = RequestBuilder::get(url).send(&client).await.unwrap();
 
     assert_eq!(res.url().as_str(), url);
     assert_eq!(res.status(), reqwest::StatusCode::OK);
@@ -111,10 +102,7 @@ async fn test_no_proxy() {
         .build()
         .unwrap();
     // set up proxy and use no_proxy to clear up client builder proxies.
-    let res = RequestBuilder::get(&url)
-        .send(&client)
-        .await
-        .unwrap();
+    let res = RequestBuilder::get(&url).send(&client).await.unwrap();
 
     assert_eq!(res.url().as_str(), &url);
     assert_eq!(res.status(), reqwest::StatusCode::OK);
@@ -171,10 +159,7 @@ async fn http_over_http() {
         .proxy(reqwest::Proxy::http(&proxy).unwrap())
         .build()
         .unwrap();
-    let res = RequestBuilder::get(url)
-        .send(&client)
-        .await
-        .unwrap();
+    let res = RequestBuilder::get(url).send(&client).await.unwrap();
 
     assert_eq!(res.url().as_str(), url);
     assert_eq!(res.status(), reqwest::StatusCode::OK);

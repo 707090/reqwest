@@ -145,9 +145,7 @@ impl<Body: From<Vec<u8>> + From<String>> RequestBuilder<Body> {
     /// This method fails whenever supplied `Url` cannot be parsed.
     pub fn new<U: IntoUrl>(method: Method, url: U) -> RequestBuilder<Body> {
         let request = url.into_url().map(move |url| Request::new(method, url));
-        let mut builder = RequestBuilder {
-            request,
-        };
+        let mut builder = RequestBuilder { request };
 
         let auth = builder
             .request
@@ -243,12 +241,7 @@ impl<Body: From<Vec<u8>> + From<String>> RequestBuilder<Body> {
     }
 
     /// Add a `Header` to this Request with ability to define if header_value is sensitive.
-    fn header_sensitive<K, V>(
-        mut self,
-        key: K,
-        value: V,
-        sensitive: bool,
-    ) -> RequestBuilder<Body>
+    fn header_sensitive<K, V>(mut self, key: K, value: V, sensitive: bool) -> RequestBuilder<Body>
     where
         HeaderName: TryFrom<K>,
         <HeaderName as TryFrom<K>>::Error: Into<http::Error>,

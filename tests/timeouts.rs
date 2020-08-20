@@ -80,7 +80,10 @@ async fn response_timeout() {
         .unwrap();
 
     let url = format!("http://{}/slow", server.addr());
-    let res = RequestBuilder::get(&url).send(&client).await.expect("Failed to get");
+    let res = RequestBuilder::get(&url)
+        .send(&client)
+        .await
+        .expect("Failed to get");
     let body = res.text().await;
 
     let err = body.unwrap_err();
@@ -111,7 +114,9 @@ fn timeout_closes_connection() {
     });
 
     let url = format!("http://{}/closes", server.addr());
-    let err = reqwest::blocking::RequestBuilder::get(&url).send(&client).unwrap_err();
+    let err = reqwest::blocking::RequestBuilder::get(&url)
+        .send(&client)
+        .unwrap_err();
 
     assert!(err.is_timeout());
     assert_eq!(err.url().map(|u| u.as_str()), Some(url.as_str()));

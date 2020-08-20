@@ -246,7 +246,9 @@ mod into_url;
 /// - there was an error while sending request
 /// - redirect limit was exhausted
 pub async fn get<T: IntoUrl>(url: T) -> crate::Result<Response> {
-    RequestBuilder::get(url).send(&Client::builder().build()?).await
+    RequestBuilder::get(url)
+        .send(&Client::builder().build()?)
+        .await
 }
 
 fn _assert_impls() {

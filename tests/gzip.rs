@@ -1,8 +1,8 @@
 mod support;
 use support::*;
 
-use std::io::Write;
 use reqwest::RequestBuilder;
+use std::io::Write;
 
 #[tokio::test]
 async fn gzip_response() {
