@@ -2,12 +2,12 @@ use std::convert::TryFrom;
 use std::time::Duration;
 
 use base64::encode;
+use fallible::TryClone;
 use http::{request::Parts, Request as HttpRequest};
 use serde::Serialize;
 #[cfg(feature = "json")]
 use serde_json;
 use url::Url;
-use fallible::TryClone;
 
 use crate::header::{HeaderMap, HeaderName, HeaderValue, CONTENT_TYPE};
 use crate::IntoUrl;
@@ -98,7 +98,7 @@ impl<Body> Request<Body> {
     }
 }
 
-impl<Body: TryClone<Error=crate::error::Error>> TryClone for Request<Body> {
+impl<Body: TryClone<Error = crate::error::Error>> TryClone for Request<Body> {
     type Error = crate::error::Error;
 
     fn try_clone(&self) -> Result<Self, Self::Error> {
@@ -613,7 +613,7 @@ impl<Body: From<Vec<u8>> + From<String>> RequestBuilder<Body> {
     }
 }
 
-impl<Body: TryClone<Error=crate::error::Error>> TryClone for RequestBuilder<Body> {
+impl<Body: TryClone<Error = crate::error::Error>> TryClone for RequestBuilder<Body> {
     type Error = crate::error::Error;
 
     /// Attempts to clone the `RequestBuilder`.
@@ -666,7 +666,7 @@ impl<Body: TryClone<Error=crate::error::Error>> TryClone for RequestBuilder<Body
             Ok(ref req) => Ok(RequestBuilder {
                 request: Ok((*req).try_clone()?),
             }),
-            Err(ref err) => Err(err.clone())
+            Err(ref err) => Err(err.clone()),
         }
     }
 }
