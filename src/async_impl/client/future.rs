@@ -3,7 +3,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use bytes::Bytes;
 use http::header::{
     CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, HeaderMap,
     HeaderValue, LOCATION, REFERER, TRANSFER_ENCODING,
@@ -12,8 +11,7 @@ use hyper::client::ResponseFuture;
 use log::debug;
 use tokio::time::Delay;
 
-use crate::{Method, StatusCode, Url, Request};
-use crate::async_impl::Body;
+use crate::{Method, StatusCode, Url};
 use crate::async_impl::response::Response;
 #[cfg(feature = "cookies")]
 use crate::cookie;
@@ -22,6 +20,8 @@ use crate::redirect::{self, remove_sensitive_headers};
 
 use super::add_cookie_header;
 use super::ClientRef;
+use crate::core::body::{Body, BodyClone};
+use crate::core::request::Request;
 
 pub struct WrapFuture<T>(Pin<Box<dyn Future<Output=T> + Send>>);
 
@@ -40,8 +40,8 @@ impl<T> Future for WrapFuture<T> {
 }
 
 pub(super) struct RequestFuture {
-    pub(super) request: Request,
-    pub(super) body: Option<Option<Bytes>>,
+    pub(super) request: Request<Body>,
+    pub(super) body: Option<Option<Box<dyn BodyClone>>>,
     pub(super) timeout: Option<Delay>,
 
     pub(super) client: Arc<ClientRef>,
@@ -170,14 +170,20 @@ impl Future for RequestFuture {
 
                             remove_sensitive_headers(&mut headers, self.request.url(), &self.redirect_chain);
                             let uri = expect_uri(self.request.url());
-                            let body = match self.body {
-                                Some(Some(ref body)) => Body::reusable(body.clone()),
+
+                            let body = match self.body.take() {
+                                Some(Some(body)) => {
+                                    let replacement_body = body.try_clone_body();
+                                    let new_body = Body(body.into());
+                                    self.body = Some(replacement_body);
+                                    new_body
+                                },
                                 _ => Body::empty(),
                             };
                             let mut req = hyper::Request::builder()
                                 .method(self.request.method().clone())
                                 .uri(uri.clone())
-                                .body(body.into_stream())
+                                .body(body)
                                 .expect("valid request parts");
 
                             // Add cookies from the cookie store.

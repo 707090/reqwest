@@ -284,8 +284,9 @@ if_hyper! {
     doctest!("../README.md");
 
     pub use self::async_impl::{
-        multipart, Body, Client, ClientBuilder, Request, RequestBuilder, Response, ResponseBuilderExt,
+        multipart, Client, ClientBuilder, Request, RequestBuilder, Response, ResponseBuilderExt,
     };
+    pub use crate::core::body::Body;
     pub use self::proxy::Proxy;
     #[cfg(feature = "__tls")]
     pub use self::tls::{Certificate, Identity};

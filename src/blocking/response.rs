@@ -15,7 +15,7 @@ use super::client::KeepCoreThreadAlive;
 use super::executor;
 #[cfg(feature = "cookies")]
 use crate::cookie;
-use crate::{async_impl, StatusCode, Url, Version};
+use crate::{async_impl, StatusCode, Url, Version, Body};
 
 /// A Response to a submitted `Request`.
 pub struct Response {
@@ -403,7 +403,7 @@ impl Read for Response {
     }
 }
 
-impl<T: Into<async_impl::body::Body>> From<http::Response<T>> for Response {
+impl<T: Into<Body>> From<http::Response<T>> for Response {
     fn from(r: http::Response<T>) -> Response {
         let response = async_impl::Response::from(r);
         Response::new(response, None, KeepCoreThreadAlive::empty())

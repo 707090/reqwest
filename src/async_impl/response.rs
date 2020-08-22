@@ -15,10 +15,10 @@ use serde_json;
 use tokio::time::Delay;
 use url::Url;
 
-use super::body::Body;
 use super::decoder::{Accepts, Decoder};
 #[cfg(feature = "cookies")]
 use crate::cookie;
+use crate::core::body::Body;
 
 /// A Response to a submitted `Request`.
 pub struct Response {

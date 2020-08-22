@@ -7,7 +7,6 @@ use std::ptr;
 
 use bytes::Bytes;
 
-use crate::async_impl;
 use fallible::TryClone;
 
 /// The body of a `Request`.
@@ -127,7 +126,7 @@ impl Body {
         }
     }
 
-    pub(crate) fn into_async(self) -> (Option<Sender>, async_impl::Body, Option<u64>) {
+    pub(crate) fn into_async(self) -> (Option<Sender>, crate::core::body::Body, Option<u64>) {
         match self.kind {
             Kind::Reader(read, len) => {
                 let (tx, rx) = hyper::Body::channel();
@@ -135,11 +134,11 @@ impl Body {
                     body: (read, len),
                     tx,
                 };
-                (Some(tx), async_impl::Body::wrap(rx), len)
+                (Some(tx), crate::core::body::Body::wrap(rx), len)
             }
             Kind::Bytes(chunk) => {
                 let len = chunk.len() as u64;
-                (None, async_impl::Body::reusable(chunk), Some(len))
+                (None, crate::core::body::Body::reusable(chunk), Some(len))
             }
         }
     }

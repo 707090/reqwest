@@ -11,7 +11,7 @@ use percent_encoding::{self, AsciiSet, NON_ALPHANUMERIC};
 use futures_core::Stream;
 use futures_util::{future, stream, StreamExt};
 
-use super::Body;
+use crate::core::body::Body;
 
 /// An async multipart/form-data request.
 pub struct Form {
@@ -154,7 +154,7 @@ impl Form {
         // then append form data followed by terminating CRLF
         boundary
             .chain(header)
-            .chain(part.value.into_stream())
+            .chain(part.value)
             .chain(stream::once(future::ready(Ok("\r\n".into()))))
     }
 

@@ -31,16 +31,16 @@ use crate::{Proxy, Url};
 use crate::connect::{Connector, HttpConnector};
 #[cfg(feature = "cookies")]
 use crate::cookie;
+use crate::core::body::Body;
 use crate::error;
 use crate::into_url::expect_uri;
 use crate::redirect;
 #[cfg(feature = "__tls")]
 use crate::tls::TlsBackend;
 
-use super::Body;
 use super::decoder::Accepts;
-use super::request::Request;
 use super::response::Response;
+use crate::core::request::Request;
 
 pub mod future;
 
@@ -877,7 +877,7 @@ impl ClientBuilder {
     }
 }
 
-type HyperClient = hyper::Client<Connector, super::body::ImplStream>;
+type HyperClient = hyper::Client<Connector, Body>;
 
 impl Default for Client {
     fn default() -> Self {
@@ -920,12 +920,12 @@ impl Client {
     /// redirect loop was detected or redirect limit was exhausted.
     pub fn execute(
         &self,
-        request: Request,
+        request: Request<Body>,
     ) -> impl Future<Output=Result<Response, crate::Error>> {
         self.execute_request(request)
     }
 
-    pub(super) fn execute_request(&self, mut req: Request) -> WrapFuture<Result<Response, crate::Error>> {
+    pub(super) fn execute_request(&self, mut req: Request<Body>) -> WrapFuture<Result<Response, crate::Error>> {
         if req.url().scheme() != "http" && req.url().scheme() != "https" {
             return WrapFuture::new(ready(Err(error::url_bad_scheme(req.url().clone()))));
         }
@@ -960,7 +960,7 @@ impl Client {
             }
         }
 
-        let reusable= req.body().map(Body::try_reuse);
+        let reusable = req.body().map(|b| b.0.try_clone_body());
 
         let uri = expect_uri(req.url());
         self.proxy_auth(&uri, req.headers_mut());
@@ -968,7 +968,7 @@ impl Client {
         let mut hyper_req = hyper::Request::builder()
             .method(req.method().clone())
             .uri(uri)
-            .body(req.body.take().unwrap_or(Body::empty()).into_stream())
+            .body(req.body.take().unwrap_or(Body::empty()))
             .expect("valid request parts");
 
         *hyper_req.headers_mut() = req.headers().clone();
