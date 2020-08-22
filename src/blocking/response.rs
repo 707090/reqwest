@@ -69,14 +69,13 @@ impl Response {
     /// Checking for specific status codes:
     ///
     /// ```rust
-    /// use reqwest::blocking::{Client, RequestBuilder};
-    /// use reqwest::StatusCode;
+    /// use reqwest::{StatusCode, RequestBuilder};
     /// # fn run() -> Result<(), Box<std::error::Error>> {
-    /// let client = Client::new();
+    /// let client = reqwest::blocking::Client::new();
     ///
     /// let resp = RequestBuilder::post("http://httpbin.org/post")
     ///     .body("possibly too large")
-    ///     .send(&client)?;
+    ///     .temp_send_blocking(&client)?;
     ///
     /// match resp.status() {
     ///     StatusCode::OK => println!("success!"),
@@ -100,13 +99,13 @@ impl Response {
     /// Saving an etag when caching a file:
     ///
     /// ```
-    /// use reqwest::blocking::{Client, RequestBuilder};
+    /// use reqwest::RequestBuilder;
     /// use reqwest::header::ETAG;
     ///
     /// # fn run() -> Result<(), Box<std::error::Error>> {
-    /// let client = Client::new();
+    /// let client = reqwest::blocking::Client::new();
     ///
-    /// let mut resp = RequestBuilder::get("http://httpbin.org/cache").send(&client)?;
+    /// let mut resp = RequestBuilder::get("http://httpbin.org/cache").temp_send_blocking(&client)?;
     /// if resp.status().is_success() {
     ///     if let Some(etag) = resp.headers().get(ETAG) {
     ///         std::fs::write("etag", etag.as_bytes());

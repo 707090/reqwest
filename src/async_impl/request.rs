@@ -2,9 +2,10 @@ use std::future::Future;
 
 use futures_util::future::ready;
 
-use crate::header::{CONTENT_LENGTH, CONTENT_TYPE};
+use crate::header::{CONTENT_TYPE};
 
-use super::{Client, client::future::WrapFuture, multipart, response::Response};
+use super::{Client, client::future::WrapFuture, response::Response};
+use crate::multipart;
 
 /// A request which can be executed with `Client::execute()`.
 pub type Request = crate::core::request::Request<crate::core::body::Body>;
@@ -12,42 +13,6 @@ pub type Request = crate::core::request::Request<crate::core::body::Body>;
 pub type RequestBuilder = crate::core::request::RequestBuilder<crate::core::body::Body>;
 
 impl RequestBuilder {
-    /// Sends a multipart/form-data body.
-    ///
-    /// ```
-    /// # use reqwest::Error;
-    ///
-    /// # async fn run() -> Result<(), Error> {
-    /// let client = reqwest::Client::new();
-    /// let form = reqwest::multipart::Form::new()
-    ///     .text("key3", "value3")
-    ///     .text("key4", "value4");
-    ///
-    ///
-    /// let response = reqwest::RequestBuilder::post("your url")
-    ///     .multipart(form)
-    ///     .send(&client)
-    ///     .await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn multipart(self, mut multipart: multipart::Form) -> RequestBuilder {
-        let mut builder = self.header(
-            CONTENT_TYPE,
-            format!("multipart/form-data; boundary={}", multipart.boundary()).as_str(),
-        );
-
-        builder = match multipart.compute_length() {
-            Some(length) => builder.header(CONTENT_LENGTH, length),
-            None => builder,
-        };
-
-        if let Ok(ref mut req) = builder.request {
-            *req.body_mut() = Some(multipart.stream())
-        }
-        builder
-    }
-
     /// Constructs the Request and sends it to the target URL using the specified client and returns
     /// a future Response.
     ///
@@ -72,6 +37,14 @@ impl RequestBuilder {
         match self.request {
             Ok(req) => WrapFuture::new(client.execute_request(req)),
             Err(err) => WrapFuture::new(ready(Err(err))),
+        }
+    }
+
+    /// TODO: This is a temporary measure until the clients can be genericized in the next commit
+    pub fn temp_send_blocking(self, client: &crate::blocking::Client) -> Result<crate::blocking::Response, crate::Error> {
+        match self.request {
+            Ok(req) => client.execute(req),
+            Err(err) => Err(err),
         }
     }
 }
@@ -219,7 +192,7 @@ mod tests {
         let stream = futures_util::stream::iter(chunks);
 
         let builder = RequestBuilder::get("http://httpbin.org/get")
-            .body(Body::wrap_stream(stream));
+            .body(Body::from_stream(stream));
         let clone = builder.try_clone();
         assert!(clone.is_err());
     }

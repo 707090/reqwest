@@ -12,20 +12,24 @@ use tokio::time::Delay;
 use super::BodyClone;
 
 pub struct StreamingBody {
-    body: Pin<Box<dyn HttpBody<Data=Bytes, Error=Box<dyn std::error::Error + Send + Sync>> + Send + Sync>>,
+    body: Pin<
+        Box<
+            dyn HttpBody<Data = Bytes, Error = Box<dyn std::error::Error + Send + Sync>>
+                + Send
+                + Sync,
+        >,
+    >,
     timeout: Option<Delay>,
 }
 
 impl StreamingBody {
     pub fn from_stream<S>(stream: S) -> StreamingBody
-        where
-            S: futures_core::stream::TryStream + Send + Sync + 'static,
-            S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
-            Bytes: From<S::Ok>,
+    where
+        S: futures_core::stream::TryStream + Send + Sync + 'static,
+        S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+        Bytes: From<S::Ok>,
     {
-        let body = Box::pin(WrapStream(
-            stream.map_ok(Bytes::from).map_err(Into::into),
-        ));
+        let body = Box::pin(WrapStream(stream.map_ok(Bytes::from).map_err(Into::into)));
         StreamingBody {
             body,
             timeout: None,
@@ -44,7 +48,9 @@ impl TryClone for StreamingBody {
     type Error = crate::error::Error;
 
     fn try_clone(&self) -> Result<Self, Self::Error> {
-        Err(crate::error::builder(crate::error::CannotCloneStreamingBodyError))
+        Err(crate::error::builder(
+            crate::error::CannotCloneStreamingBodyError,
+        ))
     }
 }
 
@@ -69,7 +75,10 @@ impl HttpBody for StreamingBody {
         Poll::Ready(opt_try_chunk)
     }
 
-    fn poll_trailers(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Result<Option<http::HeaderMap>, Self::Error>> {
+    fn poll_trailers(
+        self: Pin<&mut Self>,
+        _cx: &mut Context,
+    ) -> Poll<Result<Option<http::HeaderMap>, Self::Error>> {
         Poll::Ready(Ok(None))
     }
 
@@ -83,7 +92,7 @@ impl HttpBody for StreamingBody {
 }
 
 impl BodyClone for StreamingBody {
-    fn try_clone_body(&self) -> Option<Box<dyn BodyClone<Data=Bytes, Error=crate::Error>>> {
+    fn try_clone_body(&self) -> Option<Box<dyn BodyClone<Data = Bytes, Error = crate::Error>>> {
         None
     }
 }
@@ -97,10 +106,10 @@ impl std::fmt::Debug for StreamingBody {
 struct WrapStream<S>(S);
 
 impl<S, D, E> HttpBody for WrapStream<S>
-    where
-        S: Stream<Item=Result<D, E>>,
-        D: Into<Bytes>,
-        E: Into<Box<dyn std::error::Error + Send + Sync>>,
+where
+    S: Stream<Item = Result<D, E>>,
+    D: Into<Bytes>,
+    E: Into<Box<dyn std::error::Error + Send + Sync>>,
 {
     type Data = Bytes;
     type Error = E;

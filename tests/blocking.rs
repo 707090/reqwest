@@ -1,6 +1,8 @@
 mod support;
 use support::*;
 
+use reqwest::RequestBuilder;
+
 #[test]
 fn test_response_text() {
     let server = server::http(move |_req| async { http::Response::new("Hello".into()) });
@@ -91,9 +93,9 @@ fn test_post() {
     });
 
     let url = format!("http://{}/2", server.addr());
-    let res = reqwest::blocking::RequestBuilder::post(&url)
+    let res = RequestBuilder::post(&url)
         .body("Hello")
-        .send(&reqwest::blocking::Client::new())
+        .temp_send_blocking(&reqwest::blocking::Client::new())
         .unwrap();
 
     assert_eq!(res.url().as_str(), &url);
@@ -119,10 +121,9 @@ fn test_post_form() {
     let form = &[("hello", "world"), ("sean", "monstar")];
 
     let url = format!("http://{}/form", server.addr());
-    let client = reqwest::blocking::Client::new();
-    let res = reqwest::blocking::RequestBuilder::post(&url)
+    let res = RequestBuilder::post(&url)
         .form(form)
-        .send(&client)
+        .temp_send_blocking(&reqwest::blocking::Client::new())
         .expect("request send");
 
     assert_eq!(res.url().as_str(), &url);
@@ -185,8 +186,8 @@ fn test_default_headers() {
         .unwrap();
 
     let url = format!("http://{}/1", server.addr());
-    let res = reqwest::blocking::RequestBuilder::get(&url)
-        .send(&client)
+    let res = RequestBuilder::get(&url)
+        .temp_send_blocking(&client)
         .unwrap();
 
     assert_eq!(res.url().as_str(), &url);
@@ -214,12 +215,12 @@ fn test_override_default_headers() {
         .unwrap();
 
     let url = format!("http://{}/3", server.addr());
-    let res = reqwest::blocking::RequestBuilder::get(&url)
+    let res = RequestBuilder::get(&url)
         .header(
             http::header::AUTHORIZATION,
             http::header::HeaderValue::from_static("secret"),
         )
-        .send(&client)
+        .temp_send_blocking(&client)
         .unwrap();
 
     assert_eq!(res.url().as_str(), &url);
@@ -237,13 +238,11 @@ fn test_appended_headers_not_overwritten() {
         http::Response::default()
     });
 
-    let client = reqwest::blocking::Client::new();
-
     let url = format!("http://{}/4", server.addr());
-    let res = reqwest::blocking::RequestBuilder::get(&url)
+    let res = RequestBuilder::get(&url)
         .header(header::ACCEPT, "application/json")
         .header(header::ACCEPT, "application/json+hal")
-        .send(&client)
+        .temp_send_blocking(&reqwest::blocking::Client::new())
         .unwrap();
 
     assert_eq!(res.url().as_str(), &url);
@@ -262,10 +261,10 @@ fn test_appended_headers_not_overwritten() {
         .unwrap();
 
     let url = format!("http://{}/4", server.addr());
-    let res = reqwest::blocking::RequestBuilder::get(&url)
+    let res = RequestBuilder::get(&url)
         .header(header::ACCEPT, "application/json")
         .header(header::ACCEPT, "application/json+hal")
-        .send(&client)
+        .temp_send_blocking(&client)
         .unwrap();
 
     assert_eq!(res.url().as_str(), &url);

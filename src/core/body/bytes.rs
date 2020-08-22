@@ -41,7 +41,10 @@ impl HttpBody for BytesBody {
         Poll::Ready(opt_try_chunk)
     }
 
-    fn poll_trailers(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Result<Option<http::HeaderMap>, Self::Error>> {
+    fn poll_trailers(
+        self: Pin<&mut Self>,
+        _cx: &mut Context,
+    ) -> Poll<Result<Option<http::HeaderMap>, Self::Error>> {
         Poll::Ready(Ok(None))
     }
 
@@ -57,7 +60,7 @@ impl HttpBody for BytesBody {
 }
 
 impl BodyClone for BytesBody {
-    fn try_clone_body(&self) -> Option<Box<dyn BodyClone<Data=Bytes, Error=crate::Error>>> {
+    fn try_clone_body(&self) -> Option<Box<dyn BodyClone<Data = Bytes, Error = crate::Error>>> {
         Some(Box::new(self.clone()))
     }
 }

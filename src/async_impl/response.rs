@@ -418,7 +418,7 @@ impl<T: Into<Body>> From<http::Response<T>> for Response {
 /// A `Response` can be piped as the `Body` of another request.
 impl From<Response> for Body {
     fn from(r: Response) -> Body {
-        Body::stream(r.body)
+        Body::from_stream_inner(r.body)
     }
 }
 

@@ -21,8 +21,8 @@ use crate::{async_impl, header, Proxy, redirect};
 use crate::{Certificate, Identity};
 
 use super::executor;
-use super::request::Request;
 use super::response::Response;
+use crate::Request;
 
 mod runtime;
 
@@ -38,11 +38,11 @@ mod runtime;
 /// # Examples
 ///
 /// ```rust
-/// use reqwest::blocking::{Client, RequestBuilder};
+/// # use reqwest::RequestBuilder;
 /// #
 /// # fn run() -> Result<(), reqwest::Error> {
-/// let client = Client::new();
-/// let resp = RequestBuilder::get("http://httpbin.org/").send(&client)?;
+/// let client = reqwest::blocking::Client::new();
+/// let resp = RequestBuilder::get("http://httpbin.org/").temp_send_blocking(&client)?;
 /// #   drop(resp);
 /// #   Ok(())
 /// # }
@@ -109,6 +109,7 @@ impl ClientBuilder {
 	/// # Example
 	///
 	/// ```rust
+	/// # use reqwest::RequestBuilder;
 	/// # fn doc() -> Result<(), reqwest::Error> {
 	/// // Name your user agent after your app?
 	/// static APP_USER_AGENT: &str = concat!(
@@ -120,7 +121,7 @@ impl ClientBuilder {
 	/// let client = reqwest::blocking::Client::builder()
 	///     .user_agent(APP_USER_AGENT)
 	///     .build()?;
-	/// let res = reqwest::blocking::RequestBuilder::get("https://www.rust-lang.org").send(&client)?;
+	/// let res = RequestBuilder::get("https://www.rust-lang.org").temp_send_blocking(&client)?;
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -137,6 +138,7 @@ impl ClientBuilder {
 	/// # Example
 	///
 	/// ```rust
+	/// # use reqwest::RequestBuilder;
 	/// use reqwest::header;
 	/// # fn build_client() -> Result<(), reqwest::Error> {
 	/// let mut headers = header::HeaderMap::new();
@@ -146,7 +148,7 @@ impl ClientBuilder {
 	/// let client = reqwest::blocking::Client::builder()
 	///     .default_headers(headers)
 	///     .build()?;
-	/// let res = reqwest::blocking::RequestBuilder::get("https://www.rust-lang.org").send(&client)?;
+	/// let res = RequestBuilder::get("https://www.rust-lang.org").temp_send_blocking(&client)?;
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -154,6 +156,7 @@ impl ClientBuilder {
 	/// Override the default headers:
 	///
 	/// ```rust
+	/// # use reqwest::RequestBuilder;
 	/// use reqwest::header;
 	/// # fn build_client() -> Result<(), reqwest::Error> {
 	/// let mut headers = header::HeaderMap::new();
@@ -163,9 +166,9 @@ impl ClientBuilder {
 	/// let client = reqwest::blocking::Client::builder()
 	///     .default_headers(headers)
 	///     .build()?;
-	/// let res = reqwest::blocking::RequestBuilder::get("https://www.rust-lang.org")
+	/// let res = RequestBuilder::get("https://www.rust-lang.org")
 	///     .header(header::AUTHORIZATION, "token")
-	///     .send(&client)?;
+	///     .temp_send_blocking(&client)?;
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -606,21 +609,17 @@ impl Client {
 	/// or redirect limit was exhausted.
 	pub fn execute(&self, request: Request) -> crate::Result<Response> {
 		let (tx, rx) = oneshot::channel();
-		let (req, body) = request.into_async();
-		let url = req.url().clone();
-		let timeout = req.timeout().copied().or(self.timeout.0);
+		let url = request.url().clone();
+		let timeout = request.timeout().copied().or(self.timeout.0);
 
 		self.client_runtime
 			.task_queue_sender
 			.as_ref()
 			.expect("core thread exited early")
-			.send((req, tx))
+			.send((request, tx))
 			.expect("core thread panicked");
 
 		let send_future = async move {
-			if let Some(body) = body {
-				body.send().await?;
-			}
 			rx.await.map_err(|_canceled| event_loop_panicked()).unwrap()
 		};
 

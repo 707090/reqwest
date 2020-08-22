@@ -7,6 +7,5 @@ pub(crate) use self::decoder::Decoder;
 
 pub mod client;
 pub mod decoder;
-pub mod multipart;
 pub(crate) mod request;
 mod response;
