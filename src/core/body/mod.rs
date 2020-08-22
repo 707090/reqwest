@@ -33,7 +33,7 @@ impl TryClone for Body {
         self.0
             .try_clone_body()
             .map(|b| Body(b.into()))
-            .ok_or(crate::error::body(crate::error::CannotCloneReaderBodyError))
+            .ok_or(crate::error::body(crate::error::CannotCloneBodyError))
     }
 }
 

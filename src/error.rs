@@ -285,6 +285,12 @@ pub(crate) fn decode_io(e: io::Error) -> Error {
     }
 }
 
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Self {
+        decode_io(e)
+    }
+}
+
 // internal Error "sources"
 
 macro_rules! string_error_type {
@@ -305,6 +311,7 @@ string_error_type!(
     "Cannot clone streaming bodies"
 );
 string_error_type!(CannotCloneReaderBodyError, "Cannot clone reader bodies");
+string_error_type!(CannotCloneBodyError, "Body could not be cloned");
 
 #[cfg(test)]
 mod tests {

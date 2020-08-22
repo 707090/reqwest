@@ -920,12 +920,12 @@ impl Client {
     /// redirect loop was detected or redirect limit was exhausted.
     pub fn execute(
         &self,
-        request: Request<Body>,
+        request: Request,
     ) -> impl Future<Output=Result<Response, crate::Error>> {
         self.execute_request(request)
     }
 
-    pub(super) fn execute_request(&self, mut req: Request<Body>) -> WrapFuture<Result<Response, crate::Error>> {
+    pub(super) fn execute_request(&self, mut req: Request) -> WrapFuture<Result<Response, crate::Error>> {
         if req.url().scheme() != "http" && req.url().scheme() != "https" {
             return WrapFuture::new(ready(Err(error::url_bad_scheme(req.url().clone()))));
         }

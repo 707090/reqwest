@@ -40,7 +40,7 @@ impl<T> Future for WrapFuture<T> {
 }
 
 pub(super) struct RequestFuture {
-    pub(super) request: Request<Body>,
+    pub(super) request: Request,
     pub(super) body: Option<Option<Box<dyn BodyClone>>>,
     pub(super) timeout: Option<Delay>,
 
