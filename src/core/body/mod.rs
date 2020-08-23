@@ -6,7 +6,6 @@ use fallible::TryClone;
 use futures_core::Stream;
 use http::{HeaderMap, HeaderValue};
 use http_body::Body as HttpBody;
-use tokio::time::Delay;
 
 use streaming::StreamingBody;
 
@@ -111,7 +110,8 @@ impl Body {
         Body::new(StreamingBody::from_stream(stream))
     }
 
-    pub(crate) fn response(body: hyper::Body, timeout: Option<Delay>) -> Body {
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn response(body: hyper::Body, timeout: Option<futures_timer::Delay>) -> Body {
         Body::new(StreamingBody::from_hyper(body, timeout))
     }
 

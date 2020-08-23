@@ -2,9 +2,10 @@
 
 use std::convert::TryInto;
 
-use crate::header;
+use crate::{header, Url};
 use std::fmt;
 use std::time::SystemTime;
+use http::{HeaderMap, HeaderValue};
 
 /// A single HTTP cookie.
 pub struct Cookie<'a>(cookie_crate::Cookie<'a>);
@@ -116,3 +117,18 @@ impl<'a> fmt::Display for CookieParseError {
 }
 
 impl std::error::Error for CookieParseError {}
+
+pub(crate) fn add_cookie_header(headers: &mut HeaderMap, cookie_store: &crate::cookie::CookieStore, url: &Url) {
+    let header = cookie_store
+        .0
+        .get_request_cookies(url)
+        .map(|c| format!("{}={}", c.name(), c.value()))
+        .collect::<Vec<_>>()
+        .join("; ");
+    if !header.is_empty() {
+        headers.insert(
+            crate::header::COOKIE,
+            HeaderValue::from_bytes(header.as_bytes()).unwrap(),
+        );
+    }
+}

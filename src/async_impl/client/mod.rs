@@ -23,15 +23,17 @@ use http::uri::Scheme;
 #[cfg(feature = "native-tls-crate")]
 use native_tls_crate::TlsConnector;
 
-use future::{RequestFuture, WrapFuture};
+use future::RequestFuture;
 
 #[cfg(feature = "__tls")]
 use crate::{Certificate, Identity};
-use crate::{Proxy, Url};
+use crate::Proxy;
 use crate::connect::{Connector, HttpConnector};
 #[cfg(feature = "cookies")]
 use crate::cookie;
 use crate::core::body::Body;
+use crate::core::request::Request;
+use crate::core::WrapFuture;
 use crate::error;
 use crate::into_url::expect_uri;
 use crate::redirect;
@@ -40,7 +42,6 @@ use crate::tls::TlsBackend;
 
 use super::decoder::Accepts;
 use super::response::Response;
-use crate::core::request::Request;
 
 pub mod future;
 
@@ -949,7 +950,7 @@ impl Client {
                             ref url,
                             ..
                         } = req;
-                        add_cookie_header(headers, &cookie_store, url);
+                        crate::cookie::add_cookie_header(headers, &cookie_store, url);
                     }
                 }
             }
@@ -977,7 +978,7 @@ impl Client {
 
         let timeout = req.timeout().copied()
             .or(self.inner.request_timeout)
-            .map(tokio::time::delay_for);
+            .map(futures_timer::Delay::new);
 
         WrapFuture::new(RequestFuture {
             request: req,
@@ -1018,21 +1019,6 @@ impl Client {
     }
 }
 
-#[cfg(feature = "cookies")]
-fn add_cookie_header(headers: &mut HeaderMap, cookie_store: &cookie::CookieStore, url: &Url) {
-    let header = cookie_store
-        .0
-        .get_request_cookies(url)
-        .map(|c| format!("{}={}", c.name(), c.value()))
-        .collect::<Vec<_>>()
-        .join("; ");
-    if !header.is_empty() {
-        headers.insert(
-            crate::header::COOKIE,
-            HeaderValue::from_bytes(header.as_bytes()).unwrap(),
-        );
-    }
-}
 
 impl std::fmt::Debug for Client {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

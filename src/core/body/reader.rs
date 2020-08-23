@@ -5,8 +5,8 @@ use fallible::TryClone;
 
 use crate::core::body::BodyClone;
 use bytes::{Bytes, BytesMut};
+use http_body::Body as HttpBody;
 use http_body::SizeHint;
-use hyper::body::HttpBody;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 

@@ -6,10 +6,10 @@ use bytes::Bytes;
 use fallible::TryClone;
 use futures_core::Stream;
 use futures_util::TryStreamExt;
-use hyper::body::HttpBody;
-use tokio::time::Delay;
+use http_body::Body as HttpBody;
 
 use super::BodyClone;
+use futures_timer::Delay;
 
 pub struct StreamingBody {
     body: Pin<
@@ -36,6 +36,7 @@ impl StreamingBody {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn from_hyper(body: hyper::Body, timeout: Option<Delay>) -> StreamingBody {
         StreamingBody {
             body: Box::pin(WrapHyper(body)),
@@ -135,8 +136,10 @@ where
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 struct WrapHyper(hyper::Body);
 
+#[cfg(not(target_arch = "wasm32"))]
 impl HttpBody for WrapHyper {
     type Data = Bytes;
     type Error = Box<dyn std::error::Error + Send + Sync>;

@@ -2,7 +2,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use hyper::body::HttpBody;
+use http_body::Body as HttpBody;
 
 use super::BodyClone;
 

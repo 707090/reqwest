@@ -11,10 +11,10 @@ use serde::Serialize;
 use serde_json;
 use url::Url;
 
-use crate::async_impl::client::future::WrapFuture;
+use crate::core::WrapFuture;
 use crate::header::{HeaderMap, HeaderName, HeaderValue, CONTENT_LENGTH, CONTENT_TYPE};
 use crate::Method;
-use crate::{multipart, Body, IntoUrl, Response};
+use crate::{multipart, Body, IntoUrl};
 
 /// A request which can be executed with `Client::execute()`.
 pub struct Request {
@@ -668,10 +668,42 @@ impl RequestBuilder {
     /// # Ok(())
     /// # }
     /// ```
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn send(
         self,
         client: &crate::async_impl::Client,
-    ) -> impl Future<Output = Result<Response, crate::Error>> {
+    ) -> impl Future<Output = Result<crate::Response, crate::Error>> {
+        match self.request {
+            Ok(req) => WrapFuture::new(client.execute(req)),
+            Err(err) => WrapFuture::new(ready(Err(err))),
+        }
+    }
+
+    /// Constructs the Request and sends it to the target URL using the specified client
+    /// and returns a future Response.
+    ///
+    /// # Errors
+    ///
+    /// This method fails if there was an error while building the request, sending the request,
+    /// redirect loop was detected or redirect limit was exhausted.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use reqwest::Error;
+    /// #
+    /// # async fn run() -> Result<(), Error> {
+    /// let response = reqwest::RequestBuilder::get("https://hyper.rs")
+    ///     .send(&reqwest::Client::new())
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(target_arch = "wasm32")]
+    pub fn send(
+        self,
+        client: &crate::wasm::Client,
+    ) -> impl Future<Output = Result<crate::wasm::Response, crate::Error>> {
         match self.request {
             Ok(req) => WrapFuture::new(client.execute(req)),
             Err(err) => WrapFuture::new(ready(Err(err))),
@@ -679,6 +711,8 @@ impl RequestBuilder {
     }
 
     /// TODO: This is a temporary measure until the clients can be genericized in the next commit
+    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(feature = "blocking")]
     pub fn temp_send_blocking(
         self,
         client: &crate::blocking::Client,

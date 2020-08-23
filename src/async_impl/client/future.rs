@@ -3,41 +3,24 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
+use futures_timer::Delay;
 use http::header::{
     CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, HeaderMap,
     HeaderValue, LOCATION, REFERER, TRANSFER_ENCODING,
 };
 use hyper::client::ResponseFuture;
 use log::debug;
-use tokio::time::Delay;
 
 use crate::{Method, StatusCode, Url};
 use crate::async_impl::response::Response;
 #[cfg(feature = "cookies")]
 use crate::cookie;
+use crate::core::body::{Body, BodyClone};
+use crate::core::request::Request;
 use crate::into_url::{expect_uri, try_uri};
 use crate::redirect::{self, remove_sensitive_headers};
 
-use super::add_cookie_header;
 use super::ClientRef;
-use crate::core::body::{Body, BodyClone};
-use crate::core::request::Request;
-
-pub struct WrapFuture<T>(Pin<Box<dyn Future<Output=T> + Send>>);
-
-impl<T> WrapFuture<T> {
-    pub(crate) fn new<F: Future<Output=T> + Send + 'static>(future: F) -> WrapFuture<T> {
-        WrapFuture(Box::pin(future))
-    }
-}
-
-impl<T> Future for WrapFuture<T> {
-    type Output = T;
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        self.0.as_mut().poll(cx)
-    }
-}
 
 pub(super) struct RequestFuture {
     pub(super) request: Request,
@@ -193,7 +176,7 @@ impl Future for RequestFuture {
                                     self.client.cookie_store.as_ref()
                                     {
                                         let cookie_store = cookie_store_wrapper.read().unwrap();
-                                        add_cookie_header(&mut headers, &cookie_store, self.request.url());
+                                        crate::cookie::add_cookie_header(&mut headers, &cookie_store, self.request.url());
                                     }
                                 }
 

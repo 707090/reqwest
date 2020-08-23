@@ -56,7 +56,7 @@ pub struct Form {
     inner: FormParts<Part>,
 }
 
-/// A field in a multipart form.
+/// A field value in a multipart form.
 pub struct Part {
     meta: PartMetadata,
     value: Body,
@@ -406,7 +406,7 @@ impl<P: PartProps> FormParts<P> {
     }
 
     // If predictable, computes the length the request will have
-    // The length should be preditable if only String and file fields have been added,
+    // The length should be predictable if only String and file fields have been added,
     // but not if a generic reader has been added;
     pub(crate) fn compute_length(&mut self) -> Option<u64> {
         let mut length = 0u64;
@@ -418,7 +418,7 @@ impl<P: PartProps> FormParts<P> {
                     let header = self.percent_encoding.encode_headers(name, field.metadata());
                     let header_length = header.len();
                     self.computed_headers.push(header);
-                    // The additions mimick the format string out of which the field is constructed
+                    // The additions mimic the format string out of which the field is constructed
                     // in Reader. Not the cleanest solution because if that format string is
                     // ever changed then this formula needs to be changed too which is not an
                     // obvious dependency in the code.
@@ -537,7 +537,7 @@ impl PercentEncoding {
             },
             match field.mime {
                 Some(ref mime) => format!("\r\nContent-Type: {}", mime),
-                None => "".to_string(),
+                None => String::new(),
             },
         );
         field
