@@ -1,6 +1,6 @@
 mod support;
 use futures_util::stream::StreamExt;
-use reqwest::RequestBuilder;
+use reqwest::{Body, RequestBuilder};
 use support::*;
 
 #[tokio::test]
@@ -145,9 +145,9 @@ fn test_redirect_307_does_not_try_if_reader_cannot_reset() {
         });
 
         let url = format!("http://{}/{}", redirect.addr(), code);
-        let res = reqwest::blocking::RequestBuilder::post(&url)
-            .body(reqwest::blocking::Body::new(&b"Hello"[..]))
-            .send(&client)
+        let res = reqwest::RequestBuilder::post(&url)
+            .body(Body::from_reader(&b"Hello"[..], None))
+            .temp_send_blocking(&client)
             .unwrap();
         assert_eq!(res.url().as_str(), url);
         assert_eq!(res.status(), code);

@@ -1,9 +1,14 @@
 use std::future::Future;
-use wasm_bindgen::prelude::{wasm_bindgen, UnwrapThrowExt as _};
+
+use futures_util::TryStreamExt;
 use js_sys::Promise;
 use url::Url;
+use wasm_bindgen::prelude::{UnwrapThrowExt as _, wasm_bindgen};
+use wasm_streams::ReadableStream;
 
-use super::{Request, Response};
+use crate::Request;
+
+use super::Response;
 
 #[wasm_bindgen]
 extern "C" {
@@ -64,15 +69,24 @@ impl Default for Client {
 }
 
 async fn fetch(req: Request) -> crate::Result<Response> {
+    let Request {
+        method,
+        url,
+        headers,
+        body,
+        timeout: _timeout,
+        cors,
+    } = req;
+
     // Build the js Request
     let mut init = web_sys::RequestInit::new();
-    init.method(req.method().as_str());
+    init.method(method.as_str());
 
     let js_headers = web_sys::Headers::new()
         .map_err(crate::error::wasm)
         .map_err(crate::error::builder)?;
 
-    for (name, value) in req.headers() {
+    for (name, value) in &headers {
         js_headers
             .append(
                 name.as_str(),
@@ -84,15 +98,19 @@ async fn fetch(req: Request) -> crate::Result<Response> {
     init.headers(&js_headers.into());
 
     // When req.cors is true, do nothing because the default mode is 'cors'
-    if !req.cors {
+    if !cors {
         init.mode(web_sys::RequestMode::NoCors);
     }
 
-    if let Some(body) = req.body() {
-        init.body(Some(&body.to_js_value()?.as_ref().as_ref()));
+    if let Some(body) = body {
+        init.body(Some(
+            ReadableStream::from_stream(
+                body.map_ok(|bytes| unsafe { js_sys::Uint8Array::view(bytes.as_ref()) }.slice(0, bytes.len() as u32).into())
+                    .map_err(|error| format!("{:?}", error).into())).into_raw().as_ref()
+        ));
     }
 
-    let js_req = web_sys::Request::new_with_str_and_init(req.url().as_str(), &init)
+    let js_req = web_sys::Request::new_with_str_and_init(url.as_str(), &init)
         .map_err(crate::error::wasm)
         .map_err(crate::error::builder)?;
 

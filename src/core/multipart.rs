@@ -1,9 +1,44 @@
-//! multipart/form-data
+//! To send a `multipart/form-data` body, a [`Form`](crate::multipart::Form) is built up, adding
+//! fields or customized [`Part`](crate::multipart::Part)s, and then calling the
+//! [`multipart`][builder] method on the `RequestBuilder`.
+//!
+//! # Example
+//!
+//! ```
+//! use reqwest::{multipart, RequestBuilder, Client};
+//!
+//! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+//! let form = multipart::Form::new()
+//!     // Adding just a simple text field...
+//!     .text("username", "seanmonstar")
+//!     // And a file...
+//!     .file("photo", "/path/to/photo.png")?;
+//!
+//! // Customize all the details of a Part if needed...
+//! let bio = multipart::Part::text("hallo peeps")
+//!     .file_name("bio.txt")
+//!     .mime_str("text/plain")?;
+//!
+//! // Add the custom part to our form...
+//! let form = form.part("biography", bio);
+//!
+//! // And finally, send the form
+//! let client = Client::new();
+//! let resp = RequestBuilder::post("http://localhost:8080/user")
+//!     .multipart(form)
+//!     .send(&client)
+//!     .await?;
+//! # Ok(())
+//! # }
+//! # fn main() {}
+//! ```
+//!
+//! [builder]: ../struct.RequestBuilder.html#method.multipart
 use std::borrow::Cow;
 use std::fmt;
 use std::pin::Pin;
 
-use bytes::{Bytes};
+use bytes::Bytes;
 use http::HeaderMap;
 use mime_guess::Mime;
 use percent_encoding::{self, AsciiSet, NON_ALPHANUMERIC};
@@ -11,14 +46,17 @@ use percent_encoding::{self, AsciiSet, NON_ALPHANUMERIC};
 use futures_core::Stream;
 use futures_util::{future, stream, StreamExt};
 
-use super::Body;
+use crate::core::body::Body;
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
 
 /// An async multipart/form-data request.
 pub struct Form {
     inner: FormParts<Part>,
 }
 
-/// A field in a multipart form.
+/// A field value in a multipart form.
 pub struct Part {
     meta: PartMetadata,
     value: Body,
@@ -81,6 +119,31 @@ impl Form {
         self.part(name, Part::text(value))
     }
 
+    /// Adds a file field.
+    ///
+    /// The path will be used to try to guess the filename and mime.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # fn run() -> std::io::Result<()> {
+    /// let files = reqwest::multipart::Form::new()
+    ///     .file("key", "/path/to/file")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Errors when the file cannot be opened.
+    pub fn file<T, U>(self, name: T, path: U) -> std::io::Result<Form>
+    where
+        T: Into<Cow<'static, str>>,
+        U: AsRef<Path>,
+    {
+        Ok(self.part(name, Part::file(path)?))
+    }
+
     /// Adds a customized Part.
     pub fn part<T>(self, name: T, part: Part) -> Form
     where
@@ -126,7 +189,7 @@ impl Form {
         let last = stream::once(future::ready(Ok(
             format!("--{}--\r\n", self.boundary()).into()
         )));
-        Body::stream(stream.chain(last))
+        Body::from_stream_inner(stream.chain(last))
     }
 
     /// Generate a hyper::Body stream for a single Part instance of a Form request.
@@ -154,7 +217,7 @@ impl Form {
         // then append form data followed by terminating CRLF
         boundary
             .chain(header)
-            .chain(part.value.into_stream())
+            .chain(part.value)
             .chain(stream::once(future::ready(Ok("\r\n".into()))))
     }
 
@@ -177,8 +240,6 @@ impl fmt::Debug for Form {
         self.inner.fmt_fields("Form", f)
     }
 }
-
-// ===== impl Part =====
 
 impl Part {
     /// Makes a text parameter.
@@ -210,11 +271,47 @@ impl Part {
         Part::new(value.into())
     }
 
+    /// Adds a generic reader.
+    ///
+    /// Does not set filename or mime.
+    pub fn reader<T: Read + Send + Sync + 'static>(value: T) -> Part {
+        Part::new(Body::from_reader(value, None))
+    }
+
+    /// Adds a generic reader with known length.
+    ///
+    /// Does not set filename or mime.
+    pub fn reader_with_length<T: Read + Send + Sync + 'static>(value: T, length: usize) -> Part {
+        Part::new(Body::from_reader(value, Some(length)))
+    }
+
     fn new(value: Body) -> Part {
         Part {
             meta: PartMetadata::new(),
             value,
         }
+    }
+
+    /// Makes a file parameter.
+    ///
+    /// # Errors
+    ///
+    /// Errors when the file cannot be opened.
+    pub fn file<T: AsRef<Path>>(path: T) -> std::io::Result<Part> {
+        let path = path.as_ref();
+        let file_name = path
+            .file_name()
+            .map(|filename| filename.to_string_lossy().into_owned());
+        let ext = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
+        let mime = mime_guess::from_ext(ext).first_or_octet_stream();
+        let file = File::open(path)?;
+        let field = Part::new(Body::from(file)).mime(mime);
+
+        Ok(if let Some(file_name) = file_name {
+            field.file_name(file_name)
+        } else {
+            field
+        })
     }
 
     /// Tries to set the mime of this part.
@@ -309,7 +406,7 @@ impl<P: PartProps> FormParts<P> {
     }
 
     // If predictable, computes the length the request will have
-    // The length should be preditable if only String and file fields have been added,
+    // The length should be predictable if only String and file fields have been added,
     // but not if a generic reader has been added;
     pub(crate) fn compute_length(&mut self) -> Option<u64> {
         let mut length = 0u64;
@@ -321,7 +418,7 @@ impl<P: PartProps> FormParts<P> {
                     let header = self.percent_encoding.encode_headers(name, field.metadata());
                     let header_length = header.len();
                     self.computed_headers.push(header);
-                    // The additions mimick the format string out of which the field is constructed
+                    // The additions mimic the format string out of which the field is constructed
                     // in Reader. Not the cleanest solution because if that format string is
                     // ever changed then this formula needs to be changed too which is not an
                     // obvious dependency in the code.
@@ -440,7 +537,7 @@ impl PercentEncoding {
             },
             match field.mime {
                 Some(ref mime) => format!("\r\nContent-Type: {}", mime),
-                None => "".to_string(),
+                None => String::new(),
             },
         );
         field
@@ -508,7 +605,11 @@ mod tests {
     fn form_empty() {
         let form = Form::new();
 
-        let mut rt = runtime::Builder::new().basic_scheduler().enable_all().build().expect("new rt");
+        let mut rt = runtime::Builder::new()
+            .basic_scheduler()
+            .enable_all()
+            .build()
+            .expect("new rt");
         let body = form.stream().into_stream();
         let s = body.map_ok(|try_c| try_c.to_vec()).try_concat();
 
@@ -521,7 +622,7 @@ mod tests {
         let mut form = Form::new()
             .part(
                 "reader1",
-                Part::stream(Body::stream(stream::once(future::ready::<
+                Part::stream(Body::from_stream_inner(stream::once(future::ready::<
                     Result<String, crate::Error>,
                 >(Ok(
                     "part1".to_owned(),
@@ -531,7 +632,7 @@ mod tests {
             .part("key2", Part::text("value2").mime(mime::IMAGE_BMP))
             .part(
                 "reader2",
-                Part::stream(Body::stream(stream::once(future::ready::<
+                Part::stream(Body::from_stream_inner(stream::once(future::ready::<
                     Result<String, crate::Error>,
                 >(Ok(
                     "part2".to_owned(),
@@ -539,8 +640,7 @@ mod tests {
             )
             .part("key3", Part::text("value3").file_name("filename"));
         form.inner.boundary = "boundary".to_string();
-        let expected =
-            "--boundary\r\n\
+        let expected = "--boundary\r\n\
              Content-Disposition: form-data; name=\"reader1\"\r\n\r\n\
              part1\r\n\
              --boundary\r\n\
@@ -556,7 +656,11 @@ mod tests {
              --boundary\r\n\
              Content-Disposition: form-data; name=\"key3\"; filename=\"filename\"\r\n\r\n\
              value3\r\n--boundary--\r\n";
-        let mut rt = runtime::Builder::new().basic_scheduler().enable_all().build().expect("new rt");
+        let mut rt = runtime::Builder::new()
+            .basic_scheduler()
+            .enable_all()
+            .build()
+            .expect("new rt");
         let body = form.stream().into_stream();
         let s = body.map(|try_c| try_c.map(|r| r.to_vec())).try_concat();
 
@@ -583,7 +687,11 @@ mod tests {
                         \r\n\
                         value2\r\n\
                         --boundary--\r\n";
-        let mut rt = runtime::Builder::new().basic_scheduler().enable_all().build().expect("new rt");
+        let mut rt = runtime::Builder::new()
+            .basic_scheduler()
+            .enable_all()
+            .build()
+            .expect("new rt");
         let body = form.stream().into_stream();
         let s = body.map(|try_c| try_c.map(|r| r.to_vec())).try_concat();
 

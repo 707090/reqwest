@@ -4,21 +4,22 @@ use std::net::SocketAddr;
 
 use bytes::Bytes;
 use encoding_rs::{Encoding, UTF_8};
+use futures_timer::Delay;
 use futures_util::stream::StreamExt;
-use hyper::client::connect::HttpInfo;
 use hyper::{HeaderMap, StatusCode, Version};
+use hyper::client::connect::HttpInfo;
 use mime::Mime;
 #[cfg(feature = "json")]
 use serde::de::DeserializeOwned;
 #[cfg(feature = "json")]
 use serde_json;
-use tokio::time::Delay;
 use url::Url;
 
-use super::body::Body;
-use super::decoder::{Accepts, Decoder};
 #[cfg(feature = "cookies")]
 use crate::cookie;
+use crate::core::body::Body;
+
+use super::decoder::{Accepts, Decoder};
 
 /// A Response to a submitted `Request`.
 pub struct Response {
@@ -102,7 +103,7 @@ impl Response {
     ///
     /// This requires the optional `cookies` feature to be enabled.
     #[cfg(feature = "cookies")]
-    pub fn cookies<'a>(&'a self) -> impl Iterator<Item = cookie::Cookie<'a>> + 'a {
+    pub fn cookies<'a>(&'a self) -> impl Iterator<Item=cookie::Cookie<'a>> + 'a {
         cookie::extract_response_cookies(&self.headers).filter_map(Result::ok)
     }
 
@@ -307,7 +308,7 @@ impl Response {
     ///
     /// This requires the optional `stream` feature to be enabled.
     #[cfg(feature = "stream")]
-    pub fn bytes_stream(self) -> impl futures_core::Stream<Item = crate::Result<Bytes>> {
+    pub fn bytes_stream(self) -> impl futures_core::Stream<Item=crate::Result<Bytes>> {
         self.body
     }
 
@@ -418,7 +419,7 @@ impl<T: Into<Body>> From<http::Response<T>> for Response {
 /// A `Response` can be piped as the `Body` of another request.
 impl From<Response> for Body {
     fn from(r: Response) -> Body {
-        Body::stream(r.body)
+        Body::from_stream_inner(r.body)
     }
 }
 
@@ -442,9 +443,10 @@ impl ResponseBuilderExt for http::response::Builder {
 
 #[cfg(test)]
 mod tests {
-    use super::{Response, ResponseBuilderExt, ResponseUrl};
     use http::response::Builder;
     use url::Url;
+
+    use super::{Response, ResponseBuilderExt, ResponseUrl};
 
     #[test]
     fn test_response_builder_ext() {

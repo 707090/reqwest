@@ -285,23 +285,33 @@ pub(crate) fn decode_io(e: io::Error) -> Error {
     }
 }
 
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Self {
+        decode_io(e)
+    }
+}
+
 // internal Error "sources"
 
 macro_rules! string_error_type {
-	($type_:ident, $message:literal) => {
-		#[derive(Debug)]
-		pub(crate) struct $type_;
-		impl fmt::Display for $type_ {
-			fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-				f.write_str($message)
-			}
-		}
-		impl StdError for $type_ {}
-	}
+    ($type_:ident, $message:literal) => {
+        #[derive(Debug)]
+        pub(crate) struct $type_;
+        impl fmt::Display for $type_ {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str($message)
+            }
+        }
+        impl StdError for $type_ {}
+    };
 }
 string_error_type!(TimedOut, "operation timed out");
-string_error_type!(CannotCloneStreamingBodyError, "Cannot clone streaming bodies");
+string_error_type!(
+    CannotCloneStreamingBodyError,
+    "Cannot clone streaming bodies"
+);
 string_error_type!(CannotCloneReaderBodyError, "Cannot clone reader bodies");
+string_error_type!(CannotCloneBodyError, "Body could not be cloned");
 
 #[cfg(test)]
 mod tests {

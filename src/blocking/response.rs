@@ -15,7 +15,7 @@ use super::client::KeepCoreThreadAlive;
 use super::executor;
 #[cfg(feature = "cookies")]
 use crate::cookie;
-use crate::{async_impl, StatusCode, Url, Version};
+use crate::{async_impl, StatusCode, Url, Version, Body};
 
 /// A Response to a submitted `Request`.
 pub struct Response {
@@ -69,14 +69,13 @@ impl Response {
     /// Checking for specific status codes:
     ///
     /// ```rust
-    /// use reqwest::blocking::{Client, RequestBuilder};
-    /// use reqwest::StatusCode;
+    /// use reqwest::{StatusCode, RequestBuilder};
     /// # fn run() -> Result<(), Box<std::error::Error>> {
-    /// let client = Client::new();
+    /// let client = reqwest::blocking::Client::new();
     ///
     /// let resp = RequestBuilder::post("http://httpbin.org/post")
     ///     .body("possibly too large")
-    ///     .send(&client)?;
+    ///     .temp_send_blocking(&client)?;
     ///
     /// match resp.status() {
     ///     StatusCode::OK => println!("success!"),
@@ -100,13 +99,13 @@ impl Response {
     /// Saving an etag when caching a file:
     ///
     /// ```
-    /// use reqwest::blocking::{Client, RequestBuilder};
+    /// use reqwest::RequestBuilder;
     /// use reqwest::header::ETAG;
     ///
     /// # fn run() -> Result<(), Box<std::error::Error>> {
-    /// let client = Client::new();
+    /// let client = reqwest::blocking::Client::new();
     ///
-    /// let mut resp = RequestBuilder::get("http://httpbin.org/cache").send(&client)?;
+    /// let mut resp = RequestBuilder::get("http://httpbin.org/cache").temp_send_blocking(&client)?;
     /// if resp.status().is_success() {
     ///     if let Some(etag) = resp.headers().get(ETAG) {
     ///         std::fs::write("etag", etag.as_bytes());
@@ -403,7 +402,7 @@ impl Read for Response {
     }
 }
 
-impl<T: Into<async_impl::body::Body>> From<http::Response<T>> for Response {
+impl<T: Into<Body>> From<http::Response<T>> for Response {
     fn from(r: http::Response<T>) -> Response {
         let response = async_impl::Response::from(r);
         Response::new(response, None, KeepCoreThreadAlive::empty())

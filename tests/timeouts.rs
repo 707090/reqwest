@@ -1,7 +1,7 @@
 mod support;
 use support::*;
 
-use reqwest::RequestBuilder;
+use reqwest::{Body, RequestBuilder};
 use std::time::Duration;
 
 #[tokio::test]
@@ -114,8 +114,8 @@ fn timeout_closes_connection() {
     });
 
     let url = format!("http://{}/closes", server.addr());
-    let err = reqwest::blocking::RequestBuilder::get(&url)
-        .send(&client)
+    let err = RequestBuilder::get(&url)
+        .temp_send_blocking(&client)
         .unwrap_err();
 
     assert!(err.is_timeout());
@@ -140,9 +140,9 @@ fn timeout_blocking_request() {
     });
 
     let url = format!("http://{}/closes", server.addr());
-    let err = reqwest::blocking::RequestBuilder::get(&url)
+    let err = RequestBuilder::get(&url)
         .timeout(Duration::from_millis(500))
-        .send(&client)
+        .temp_send_blocking(&client)
         .unwrap_err();
 
     assert!(err.is_timeout());
@@ -154,7 +154,7 @@ fn timeout_blocking_request() {
 fn write_timeout_large_body() {
     let _ = env_logger::try_init();
     let body = vec![b'x'; 20_000];
-    let len = 8192;
+    let len = 20_000;
 
     // Make Client drop *after* the Server, so the background doesn't
     // close too early.
@@ -173,9 +173,9 @@ fn write_timeout_large_body() {
 
     let cursor = std::io::Cursor::new(body);
     let url = format!("http://{}/write-timeout", server.addr());
-    let err = reqwest::blocking::RequestBuilder::post(&url)
-        .body(reqwest::blocking::Body::sized(cursor, len as u64))
-        .send(&client)
+    let err = RequestBuilder::post(&url)
+        .body(Body::from_reader(cursor, Some(len)))
+        .temp_send_blocking(&client)
         .unwrap_err();
 
     assert!(err.is_timeout());

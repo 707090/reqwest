@@ -4,15 +4,14 @@ use futures_core::Future;
 use log::{error, trace};
 use tokio::sync::{mpsc, oneshot};
 
-use crate::async_impl;
-use crate::blocking::executor;
+use crate::{async_impl, blocking::executor, Request};
 
 use super::event_loop_panicked;
 
 /// A one-shot channel to send the response from the client runtime thread back to the original thread.
 type OneshotResponder = oneshot::Sender<crate::Result<async_impl::Response>>;
 /// The input for the runtime's task queue. Each task is a request and a channel to respond with.
-type TaskQueueSender = mpsc::UnboundedSender<(async_impl::Request, OneshotResponder)>;
+type TaskQueueSender = mpsc::UnboundedSender<(Request, OneshotResponder)>;
 
 pub struct ClientRuntime {
     /// The sender is an option for the purposes of shutting down the runtime, but should always be Some.
@@ -38,7 +37,7 @@ impl Drop for ClientRuntime {
 
 impl ClientRuntime {
     pub fn new(client: async_impl::Client) -> crate::Result<ClientRuntime> {
-        let (task_queue_sender, mut task_queue_receiver) = mpsc::unbounded_channel::<(async_impl::Request, OneshotResponder)>();
+        let (task_queue_sender, mut task_queue_receiver) = mpsc::unbounded_channel::<(Request, OneshotResponder)>();
         let (runtime_startup_indicator_tx, runtime_startup_indicator_rx) = oneshot::channel::<crate::Result<()>>();
         let runtime_thread = thread::Builder::new()
             .name("reqwest-internal-sync-runtime".into())
@@ -49,7 +48,7 @@ impl ClientRuntime {
                             error!("Failed to communicate runtime creation failure: {:?}", send_err);
                         }
                         return;
-                    },
+                    }
                     Ok(value) => value,
                 };
                 if let Err(send_err) = runtime_startup_indicator_tx.send(Ok(())) {

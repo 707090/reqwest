@@ -195,6 +195,12 @@ pub use http::Method;
 pub use http::{StatusCode, Version};
 pub use url::Url;
 
+pub use crate::core::{
+    body::Body,
+    multipart,
+    request::{Request, RequestBuilder},
+};
+
 pub use self::error::{Error, Result};
 pub use self::into_url::IntoUrl;
 
@@ -284,7 +290,7 @@ if_hyper! {
     doctest!("../README.md");
 
     pub use self::async_impl::{
-        multipart, Body, Client, ClientBuilder, Request, RequestBuilder, Response, ResponseBuilderExt,
+        Client, ClientBuilder, Response, ResponseBuilderExt,
     };
     pub use self::proxy::Proxy;
     #[cfg(feature = "__tls")]
@@ -310,5 +316,5 @@ if_wasm! {
     mod wasm;
     mod util;
 
-    pub use self::wasm::{multipart, Body, Client, ClientBuilder, Request, RequestBuilder, Response};
+    pub use self::wasm::{Client, ClientBuilder, Response};
 }

@@ -15,8 +15,8 @@ use futures_util::stream::Peekable;
 use http::HeaderMap;
 use hyper::body::HttpBody;
 
-use super::super::Body;
 use crate::error;
+use crate::core::body::Body;
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Accepts {
@@ -35,7 +35,7 @@ pub(crate) struct Decoder {
 
 enum Inner {
     /// A `PlainText` decoder just returns the response content as is.
-    PlainText(super::body::ImplStream),
+    PlainText(Body),
 
     /// A `Gzip` decoder will uncompress the gzipped response content before returning it.
     #[cfg(feature = "gzip")]
@@ -53,7 +53,7 @@ enum Inner {
 /// A future attempt to poll the response body for EOF so we know whether to use gzip or not.
 struct Pending(Peekable<IoStream>, DecoderType);
 
-struct IoStream(super::body::ImplStream);
+struct IoStream(Body);
 
 enum DecoderType {
     #[cfg(feature = "gzip")]
@@ -72,7 +72,7 @@ impl Decoder {
     #[cfg(feature = "blocking")]
     pub(crate) fn empty() -> Decoder {
         Decoder {
-            inner: Inner::PlainText(Body::empty().into_stream()),
+            inner: Inner::PlainText(Body::empty()),
         }
     }
 
@@ -81,7 +81,7 @@ impl Decoder {
     /// This decoder will emit the underlying chunks as-is.
     fn plain_text(body: Body) -> Decoder {
         Decoder {
-            inner: Inner::PlainText(body.into_stream()),
+            inner: Inner::PlainText(body),
         }
     }
 
@@ -94,7 +94,7 @@ impl Decoder {
 
         Decoder {
             inner: Inner::Pending(Pending(
-                IoStream(body.into_stream()).peekable(),
+                IoStream(body).peekable(),
                 DecoderType::Gzip,
             )),
         }
@@ -109,7 +109,7 @@ impl Decoder {
 
         Decoder {
             inner: Inner::Pending(Pending(
-                IoStream(body.into_stream()).peekable(),
+                IoStream(body).peekable(),
                 DecoderType::Brotli,
             )),
         }
@@ -292,12 +292,12 @@ impl Future for Pending {
                 .expect("just peeked Some")
                 .unwrap_err()));
             }
-            None => return Poll::Ready(Ok(Inner::PlainText(Body::empty().into_stream()))),
+            None => return Poll::Ready(Ok(Inner::PlainText(Body::empty()))),
         };
 
         let _body = std::mem::replace(
             &mut self.0,
-            IoStream(Body::empty().into_stream()).peekable(),
+            IoStream(Body::empty()).peekable(),
         );
 
         match self.1 {

@@ -41,12 +41,12 @@
 //! Reader, you can use the `reqwest::blocking::Body::new()` constructor.
 //!
 //! ```rust
-//! # use reqwest::Error;
+//! # use reqwest::{Error, RequestBuilder};
 //! #
 //! # fn run() -> Result<(), Error> {
-//! let res = reqwest::blocking::RequestBuilder::post("http://httpbin.org/post")
+//! let res = RequestBuilder::post("http://httpbin.org/post")
 //!     .body("the exact body that is sent")
-//!     .send(&reqwest::blocking::Client::new())?;
+//!     .temp_send_blocking(&reqwest::blocking::Client::new())?;
 //! # Ok(())
 //! # }
 //! ```
@@ -56,16 +56,11 @@
 //! Most features available to the asynchronous `Client` are also available,
 //! on the blocking `Client`, see those docs for more.
 
-mod body;
 mod client;
-pub mod multipart;
-mod request;
 mod response;
 mod executor;
 
-pub use self::body::Body;
 pub use self::client::{Client, ClientBuilder};
-pub use self::request::{Request, RequestBuilder};
 pub use self::response::Response;
 
 /// Shortcut method to quickly make a *blocking* `GET` request.
@@ -95,5 +90,5 @@ pub use self::response::Response;
 /// - redirect loop was detected
 /// - redirect limit was exhausted
 pub fn get<T: crate::IntoUrl>(url: T) -> crate::Result<Response> {
-    RequestBuilder::get(url).send(&Client::builder().build()?)
+    crate::RequestBuilder::get(url).temp_send_blocking(&Client::builder().build()?)
 }
