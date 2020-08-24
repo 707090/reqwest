@@ -42,7 +42,7 @@ mod runtime;
 /// #
 /// # fn run() -> Result<(), reqwest::Error> {
 /// let client = reqwest::blocking::Client::new();
-/// let resp = RequestBuilder::get("http://httpbin.org/").temp_send_blocking(&client)?;
+/// let resp = RequestBuilder::get("http://httpbin.org/").send(&client)?;
 /// #   drop(resp);
 /// #   Ok(())
 /// # }
@@ -121,7 +121,7 @@ impl ClientBuilder {
 	/// let client = reqwest::blocking::Client::builder()
 	///     .user_agent(APP_USER_AGENT)
 	///     .build()?;
-	/// let res = RequestBuilder::get("https://www.rust-lang.org").temp_send_blocking(&client)?;
+	/// let res = RequestBuilder::get("https://www.rust-lang.org").send(&client)?;
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -148,7 +148,7 @@ impl ClientBuilder {
 	/// let client = reqwest::blocking::Client::builder()
 	///     .default_headers(headers)
 	///     .build()?;
-	/// let res = RequestBuilder::get("https://www.rust-lang.org").temp_send_blocking(&client)?;
+	/// let res = RequestBuilder::get("https://www.rust-lang.org").send(&client)?;
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -168,7 +168,7 @@ impl ClientBuilder {
 	///     .build()?;
 	/// let res = RequestBuilder::get("https://www.rust-lang.org")
 	///     .header(header::AUTHORIZATION, "token")
-	///     .temp_send_blocking(&client)?;
+	///     .send(&client)?;
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -607,7 +607,7 @@ impl Client {
 	///
 	/// This method fails if there was an error while sending request,
 	/// or redirect limit was exhausted.
-	pub fn execute(&self, request: Request) -> crate::Result<Response> {
+	pub fn send(&self, request: Request) -> crate::Result<Response> {
 		let (tx, rx) = oneshot::channel();
 		let url = request.url().clone();
 		let timeout = request.timeout().copied().or(self.timeout.0);
@@ -634,6 +634,14 @@ impl Client {
 				KeepCoreThreadAlive(Some(self.client_runtime.clone())),
 			))
 			.map_err(|response_error| response_error.with_url(url.clone()))
+	}
+}
+
+impl crate::core::Client for Client {
+	type Response = crate::Result<Response>;
+
+	fn send(&self, request: crate::Result<Request>) -> Self::Response {
+		self.send(request?)
 	}
 }
 

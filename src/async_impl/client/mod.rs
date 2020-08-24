@@ -6,14 +6,13 @@ feature = "rustls-tls",
 ))]
 use std::any::Any;
 use std::convert::TryInto;
-use std::future::Future;
 use std::net::IpAddr;
 use std::sync::Arc;
 #[cfg(feature = "cookies")]
 use std::sync::RwLock;
 use std::time::Duration;
 
-use futures_util::future::ready;
+use futures_core::Future;
 use http::header::{
     ACCEPT, ACCEPT_ENCODING, Entry, HeaderMap,
     HeaderValue, PROXY_AUTHORIZATION, RANGE, USER_AGENT,
@@ -27,15 +26,15 @@ use future::RequestFuture;
 
 #[cfg(feature = "__tls")]
 use crate::{Certificate, Identity};
-use crate::Proxy;
 use crate::connect::{Connector, HttpConnector};
 #[cfg(feature = "cookies")]
 use crate::cookie;
 use crate::core::body::Body;
 use crate::core::request::Request;
-use crate::core::WrapFuture;
+use crate::core::SendFuture;
 use crate::error;
 use crate::into_url::expect_uri;
+use crate::Proxy;
 use crate::redirect;
 #[cfg(feature = "__tls")]
 use crate::tls::TlsBackend;
@@ -919,22 +918,15 @@ impl Client {
     ///
     /// This method fails if there was an error while sending request,
     /// redirect loop was detected or redirect limit was exhausted.
-    pub fn execute(
-        &self,
-        request: Request,
-    ) -> impl Future<Output=Result<Response, crate::Error>> {
-        self.execute_request(request)
-    }
-
-    pub(super) fn execute_request(&self, mut req: Request) -> WrapFuture<Result<Response, crate::Error>> {
-        if req.url().scheme() != "http" && req.url().scheme() != "https" {
-            return WrapFuture::new(ready(Err(error::url_bad_scheme(req.url().clone()))));
+    pub fn send(&self, mut request: Request) -> impl Future<Output=crate::Result<Response>> {
+        if request.url().scheme() != "http" && request.url().scheme() != "https" {
+            return SendFuture::error(error::url_bad_scheme(request.url().clone()));
         }
 
         // insert default headers in the request headers
         // without overwriting already appended headers.
         for (key, value) in &self.inner.default_headers {
-            if let Entry::Vacant(entry) = req.headers_mut().entry(key) {
+            if let Entry::Vacant(entry) = request.headers_mut().entry(key) {
                 entry.insert(value.clone());
             }
         }
@@ -943,45 +935,45 @@ impl Client {
         #[cfg(feature = "cookies")]
             {
                 if let Some(cookie_store_wrapper) = self.inner.cookie_store.as_ref() {
-                    if req.headers().get(crate::header::COOKIE).is_none() {
+                    if request.headers().get(crate::header::COOKIE).is_none() {
                         let cookie_store = cookie_store_wrapper.read().unwrap();
                         let Request {
                             ref mut headers,
                             ref url,
                             ..
-                        } = req;
+                        } = request;
                         crate::cookie::add_cookie_header(headers, &cookie_store, url);
                     }
                 }
             }
 
         if let Some(accept_encoding) = self.inner.accepts.as_str() {
-            if !req.headers().contains_key(ACCEPT_ENCODING) && !req.headers().contains_key(RANGE) {
-                req.headers_mut().insert(ACCEPT_ENCODING, HeaderValue::from_static(accept_encoding));
+            if !request.headers().contains_key(ACCEPT_ENCODING) && !request.headers().contains_key(RANGE) {
+                request.headers_mut().insert(ACCEPT_ENCODING, HeaderValue::from_static(accept_encoding));
             }
         }
 
-        let reusable = req.body().map(|b| b.0.try_clone_body());
+        let reusable = request.body().map(|b| b.0.try_clone_body());
 
-        let uri = expect_uri(req.url());
-        self.proxy_auth(&uri, req.headers_mut());
+        let uri = expect_uri(request.url());
+        self.proxy_auth(&uri, request.headers_mut());
 
         let mut hyper_req = hyper::Request::builder()
-            .method(req.method().clone())
+            .method(request.method().clone())
             .uri(uri)
-            .body(req.body.take().unwrap_or(Body::empty()))
+            .body(request.body.take().unwrap_or(Body::empty()))
             .expect("valid request parts");
 
-        *hyper_req.headers_mut() = req.headers().clone();
+        *hyper_req.headers_mut() = request.headers().clone();
 
         let in_flight = self.inner.hyper.request(hyper_req);
 
-        let timeout = req.timeout().copied()
+        let timeout = request.timeout().copied()
             .or(self.inner.request_timeout)
             .map(futures_timer::Delay::new);
 
-        WrapFuture::new(RequestFuture {
-            request: req,
+        SendFuture::future(RequestFuture {
+            request,
             body: reusable,
             timeout,
 
@@ -1019,6 +1011,13 @@ impl Client {
     }
 }
 
+impl crate::core::Client for Client {
+    type Response = SendFuture<Response>;
+
+    fn send(&self, request: crate::Result<Request>) -> Self::Response {
+        request.map_or_else(SendFuture::error, |request| SendFuture::future(self.send(request)))
+    }
+}
 
 impl std::fmt::Debug for Client {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

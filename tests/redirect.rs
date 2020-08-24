@@ -147,7 +147,7 @@ fn test_redirect_307_does_not_try_if_reader_cannot_reset() {
         let url = format!("http://{}/{}", redirect.addr(), code);
         let res = reqwest::RequestBuilder::post(&url)
             .body(Body::from_reader(&b"Hello"[..], None))
-            .temp_send_blocking(&client)
+            .send(&client)
             .unwrap();
         assert_eq!(res.url().as_str(), url);
         assert_eq!(res.status(), code);

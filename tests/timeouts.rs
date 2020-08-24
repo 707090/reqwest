@@ -115,7 +115,7 @@ fn timeout_closes_connection() {
 
     let url = format!("http://{}/closes", server.addr());
     let err = RequestBuilder::get(&url)
-        .temp_send_blocking(&client)
+        .send(&client)
         .unwrap_err();
 
     assert!(err.is_timeout());
@@ -142,7 +142,7 @@ fn timeout_blocking_request() {
     let url = format!("http://{}/closes", server.addr());
     let err = RequestBuilder::get(&url)
         .timeout(Duration::from_millis(500))
-        .temp_send_blocking(&client)
+        .send(&client)
         .unwrap_err();
 
     assert!(err.is_timeout());
@@ -175,7 +175,7 @@ fn write_timeout_large_body() {
     let url = format!("http://{}/write-timeout", server.addr());
     let err = RequestBuilder::post(&url)
         .body(Body::from_reader(cursor, Some(len)))
-        .temp_send_blocking(&client)
+        .send(&client)
         .unwrap_err();
 
     assert!(err.is_timeout());

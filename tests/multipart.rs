@@ -172,7 +172,7 @@ fn blocking_file_part() {
 
     let res = reqwest::RequestBuilder::post(&url)
         .multipart(form)
-        .temp_send_blocking(&reqwest::blocking::Client::new())
+        .send(&reqwest::blocking::Client::new())
         .unwrap();
 
     assert_eq!(res.url().as_str(), &url);

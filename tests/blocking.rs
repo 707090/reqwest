@@ -95,7 +95,7 @@ fn test_post() {
     let url = format!("http://{}/2", server.addr());
     let res = RequestBuilder::post(&url)
         .body("Hello")
-        .temp_send_blocking(&reqwest::blocking::Client::new())
+        .send(&reqwest::blocking::Client::new())
         .unwrap();
 
     assert_eq!(res.url().as_str(), &url);
@@ -123,7 +123,7 @@ fn test_post_form() {
     let url = format!("http://{}/form", server.addr());
     let res = RequestBuilder::post(&url)
         .form(form)
-        .temp_send_blocking(&reqwest::blocking::Client::new())
+        .send(&reqwest::blocking::Client::new())
         .expect("request send");
 
     assert_eq!(res.url().as_str(), &url);
@@ -187,7 +187,7 @@ fn test_default_headers() {
 
     let url = format!("http://{}/1", server.addr());
     let res = RequestBuilder::get(&url)
-        .temp_send_blocking(&client)
+        .send(&client)
         .unwrap();
 
     assert_eq!(res.url().as_str(), &url);
@@ -220,7 +220,7 @@ fn test_override_default_headers() {
             http::header::AUTHORIZATION,
             http::header::HeaderValue::from_static("secret"),
         )
-        .temp_send_blocking(&client)
+        .send(&client)
         .unwrap();
 
     assert_eq!(res.url().as_str(), &url);
@@ -242,7 +242,7 @@ fn test_appended_headers_not_overwritten() {
     let res = RequestBuilder::get(&url)
         .header(header::ACCEPT, "application/json")
         .header(header::ACCEPT, "application/json+hal")
-        .temp_send_blocking(&reqwest::blocking::Client::new())
+        .send(&reqwest::blocking::Client::new())
         .unwrap();
 
     assert_eq!(res.url().as_str(), &url);
@@ -264,7 +264,7 @@ fn test_appended_headers_not_overwritten() {
     let res = RequestBuilder::get(&url)
         .header(header::ACCEPT, "application/json")
         .header(header::ACCEPT, "application/json+hal")
-        .temp_send_blocking(&client)
+        .send(&client)
         .unwrap();
 
     assert_eq!(res.url().as_str(), &url);

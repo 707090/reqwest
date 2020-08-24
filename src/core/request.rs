@@ -3,15 +3,13 @@ use std::time::Duration;
 
 use base64::encode;
 use fallible::TryClone;
-use futures_core::Future;
-use futures_util::future::ready;
 use http::{request::Parts, Request as HttpRequest};
 use serde::Serialize;
 #[cfg(feature = "json")]
 use serde_json;
 use url::Url;
 
-use crate::core::WrapFuture;
+use crate::core::Client;
 use crate::header::{HeaderMap, HeaderName, HeaderValue, CONTENT_LENGTH, CONTENT_TYPE};
 use crate::Method;
 use crate::{multipart, Body, IntoUrl};
@@ -98,6 +96,31 @@ impl Request {
     #[inline]
     pub fn timeout_mut(&mut self) -> &mut Option<Duration> {
         &mut self.timeout
+    }
+
+    /// Sends the Request to the target URL using the specified client and returns the client's Response.
+    ///
+    /// # Errors
+    ///
+    /// This method fails if there was an error while sending the request, for exmaple, a redirect loop was
+    /// detected or redirect limit was exhausted.
+    ///
+    /// # Example
+    ///
+    /// Using async client
+    ///
+    /// ```no_run
+    /// # use reqwest::Error;
+    /// #
+    /// # async fn run() -> Result<(), Error> {
+    /// let response = reqwest::RequestBuilder::get("https://hyper.rs")
+    ///     .send(&reqwest::Client::new())
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn send<C: Client>(self, client: &C) -> C::Response {
+        Client::send(client, Ok(self))
     }
 }
 
@@ -649,14 +672,16 @@ impl RequestBuilder {
     }
 
     /// Constructs the Request and sends it to the target URL using the specified client and returns
-    /// a future Response.
+    /// the client's Response.
     ///
     /// # Errors
     ///
-    /// This method fails if there was an error while building the request, sending the request,
-    /// redirect loop was detected or redirect limit was exhausted.
+    /// This method fails if there was an error while building the request or sending the request,
+    /// for example, a redirect loop was detected or redirect limit was exhausted.
     ///
     /// # Example
+    ///
+    /// Using async client
     ///
     /// ```no_run
     /// # use reqwest::Error;
@@ -668,59 +693,8 @@ impl RequestBuilder {
     /// # Ok(())
     /// # }
     /// ```
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn send(
-        self,
-        client: &crate::async_impl::Client,
-    ) -> impl Future<Output = Result<crate::Response, crate::Error>> {
-        match self.request {
-            Ok(req) => WrapFuture::new(client.execute(req)),
-            Err(err) => WrapFuture::new(ready(Err(err))),
-        }
-    }
-
-    /// Constructs the Request and sends it to the target URL using the specified client
-    /// and returns a future Response.
-    ///
-    /// # Errors
-    ///
-    /// This method fails if there was an error while building the request, sending the request,
-    /// redirect loop was detected or redirect limit was exhausted.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// # use reqwest::Error;
-    /// #
-    /// # async fn run() -> Result<(), Error> {
-    /// let response = reqwest::RequestBuilder::get("https://hyper.rs")
-    ///     .send(&reqwest::Client::new())
-    ///     .await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[cfg(target_arch = "wasm32")]
-    pub fn send(
-        self,
-        client: &crate::wasm::Client,
-    ) -> impl Future<Output = Result<crate::wasm::Response, crate::Error>> {
-        match self.request {
-            Ok(req) => WrapFuture::new(client.execute(req)),
-            Err(err) => WrapFuture::new(ready(Err(err))),
-        }
-    }
-
-    /// TODO: This is a temporary measure until the clients can be genericized in the next commit
-    #[cfg(not(target_arch = "wasm32"))]
-    #[cfg(feature = "blocking")]
-    pub fn temp_send_blocking(
-        self,
-        client: &crate::blocking::Client,
-    ) -> Result<crate::blocking::Response, crate::Error> {
-        match self.request {
-            Ok(req) => client.execute(req),
-            Err(err) => Err(err),
-        }
+    pub fn send<C: Client>(self, client: &C) -> C::Response {
+        Client::send(client, self.request)
     }
 }
 
