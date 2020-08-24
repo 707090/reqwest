@@ -75,7 +75,7 @@ impl Response {
     ///
     /// let resp = RequestBuilder::post("http://httpbin.org/post")
     ///     .body("possibly too large")
-    ///     .temp_send_blocking(&client)?;
+    ///     .send(&client)?;
     ///
     /// match resp.status() {
     ///     StatusCode::OK => println!("success!"),
@@ -105,7 +105,7 @@ impl Response {
     /// # fn run() -> Result<(), Box<std::error::Error>> {
     /// let client = reqwest::blocking::Client::new();
     ///
-    /// let mut resp = RequestBuilder::get("http://httpbin.org/cache").temp_send_blocking(&client)?;
+    /// let mut resp = RequestBuilder::get("http://httpbin.org/cache").send(&client)?;
     /// if resp.status().is_success() {
     ///     if let Some(etag) = resp.headers().get(ETAG) {
     ///         std::fs::write("etag", etag.as_bytes());

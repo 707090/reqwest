@@ -61,7 +61,7 @@ impl ClientRuntime {
                     // Continue receiving tasks from the queue until the sender is dropped (indicated by
                     // receiving a None).
                     while let Some((req, responder)) = task_queue_receiver.recv().await {
-                        tokio::spawn(await_while_open(client.execute(req), responder));
+                        tokio::spawn(await_while_open(client.send(req), responder));
                     }
 
                     trace!("({:?}) Receiver is shutdown", thread::current().id());

@@ -6,6 +6,7 @@ use url::Url;
 use wasm_bindgen::prelude::{UnwrapThrowExt as _, wasm_bindgen};
 use wasm_streams::ReadableStream;
 
+use crate::core::SendFuture;
 use crate::Request;
 
 use super::Response;
@@ -47,18 +48,16 @@ impl Client {
     ///
     /// This method fails if there was an error while sending request,
     /// redirect loop was detected or redirect limit was exhausted.
-    pub fn execute(
-        &self,
-        request: Request,
-    ) -> impl Future<Output = Result<Response, crate::Error>> {
-        self.execute_request(request)
+    pub fn send(&self, request: Request) -> impl Future<Output=crate::Result<Response>> {
+        fetch(request)
     }
+}
 
-    pub(super) fn execute_request(
-        &self,
-        req: Request,
-    ) -> impl Future<Output = crate::Result<Response>> {
-        fetch(req)
+impl crate::core::Client for Client {
+    type Response = SendFuture<Response>;
+
+    fn send(&self, request: crate::Result<Request>) -> Self::Response {
+        request.map_or_else(SendFuture::error, |request| SendFuture::future(self.send(request)))
     }
 }
 
