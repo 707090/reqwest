@@ -1,7 +1,4 @@
-#[cfg(any(
-    feature = "native-tls",
-    feature = "rustls-tls",
-))]
+#[cfg(any(feature = "native-tls", feature = "rustls-tls",))]
 use std::any::Any;
 use std::convert::TryInto;
 use std::fmt;
@@ -15,12 +12,13 @@ use http::header::HeaderValue;
 use log::{error, trace};
 use tokio::sync::{mpsc, oneshot};
 
-use super::request::{Request, RequestBuilder};
-use super::response::Response;
-use super::wait;
-use crate::{async_impl, header, IntoUrl, Method, Proxy, redirect};
+use crate::{async_impl, header, redirect, Proxy};
 #[cfg(feature = "__tls")]
 use crate::{Certificate, Identity};
+
+use super::request::Request;
+use super::response::Response;
+use super::wait;
 
 /// A `Client` to make Requests with.
 ///
@@ -34,11 +32,11 @@ use crate::{Certificate, Identity};
 /// # Examples
 ///
 /// ```rust
-/// use reqwest::blocking::Client;
+/// use reqwest::blocking::{Client, RequestBuilder};
 /// #
 /// # fn run() -> Result<(), reqwest::Error> {
 /// let client = Client::new();
-/// let resp = client.get("http://httpbin.org/").send()?;
+/// let resp = RequestBuilder::get("http://httpbin.org/").send(&client)?;
 /// #   drop(resp);
 /// #   Ok(())
 /// # }
@@ -95,9 +93,7 @@ impl ClientBuilder {
         ClientHandle::new(self).map(|handle| Client { inner: handle })
     }
 
-
     // Higher-level options
-
 
     /// Sets the `User-Agent` header to be used by this client.
     ///
@@ -115,7 +111,7 @@ impl ClientBuilder {
     /// let client = reqwest::blocking::Client::builder()
     ///     .user_agent(APP_USER_AGENT)
     ///     .build()?;
-    /// let res = client.get("https://www.rust-lang.org").send()?;
+    /// let res = reqwest::blocking::RequestBuilder::get("https://www.rust-lang.org").send(&client)?;
     /// # Ok(())
     /// # }
     /// ```
@@ -141,7 +137,7 @@ impl ClientBuilder {
     /// let client = reqwest::blocking::Client::builder()
     ///     .default_headers(headers)
     ///     .build()?;
-    /// let res = client.get("https://www.rust-lang.org").send()?;
+    /// let res = reqwest::blocking::RequestBuilder::get("https://www.rust-lang.org").send(&client)?;
     /// # Ok(())
     /// # }
     /// ```
@@ -158,10 +154,9 @@ impl ClientBuilder {
     /// let client = reqwest::blocking::Client::builder()
     ///     .default_headers(headers)
     ///     .build()?;
-    /// let res = client
-    ///     .get("https://www.rust-lang.org")
+    /// let res = reqwest::blocking::RequestBuilder::get("https://www.rust-lang.org")
     ///     .header(header::AUTHORIZATION, "token")
-    ///     .send()?;
+    ///     .send(&client)?;
     /// # Ok(())
     /// # }
     /// ```
@@ -505,10 +500,7 @@ impl ClientBuilder {
     ///
     /// This requires one of the optional features `native-tls` or
     /// `rustls-tls` to be enabled.
-    #[cfg(any(
-        feature = "native-tls",
-        feature = "rustls-tls",
-    ))]
+    #[cfg(any(feature = "native-tls", feature = "rustls-tls",))]
     pub fn use_preconfigured_tls(self, tls: impl Any) -> ClientBuilder {
         self.with_inner(move |inner| inner.use_preconfigured_tls(tls))
     }
@@ -581,73 +573,6 @@ impl Client {
         ClientBuilder::new()
     }
 
-    /// Convenience method to make a `GET` request to a URL.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn get<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.request(Method::GET, url)
-    }
-
-    /// Convenience method to make a `POST` request to a URL.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn post<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.request(Method::POST, url)
-    }
-
-    /// Convenience method to make a `PUT` request to a URL.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn put<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.request(Method::PUT, url)
-    }
-
-    /// Convenience method to make a `PATCH` request to a URL.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn patch<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.request(Method::PATCH, url)
-    }
-
-    /// Convenience method to make a `DELETE` request to a URL.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn delete<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.request(Method::DELETE, url)
-    }
-
-    /// Convenience method to make a `HEAD` request to a URL.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn head<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.request(Method::HEAD, url)
-    }
-
-    /// Start building a `Request` with the `Method` and `Url`.
-    ///
-    /// Returns a `RequestBuilder`, which will allow setting headers and
-    /// request body before sending.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn request<U: IntoUrl>(&self, method: Method, url: U) -> RequestBuilder {
-        let req = url.into_url().map(move |url| Request::new(method, url));
-        RequestBuilder::new(self.clone(), req)
-    }
-
     /// Executes a `Request`.
     ///
     /// A `Request` can be built manually with `Request::new()` or obtained
@@ -697,7 +622,8 @@ struct InnerClientHandle {
 
 impl Drop for InnerClientHandle {
     fn drop(&mut self) {
-        let id = self.thread
+        let id = self
+            .thread
             .as_ref()
             .map(|h| h.thread().id())
             .expect("thread not dropped yet");
@@ -720,7 +646,12 @@ impl ClientHandle {
             .name("reqwest-internal-sync-runtime".into())
             .spawn(move || {
                 use tokio::runtime;
-                let mut rt = match runtime::Builder::new().basic_scheduler().enable_all().build().map_err(crate::error::builder) {
+                let mut rt = match runtime::Builder::new()
+                    .basic_scheduler()
+                    .enable_all()
+                    .build()
+                    .map_err(crate::error::builder)
+                {
                     Err(e) => {
                         if let Err(e) = spawn_tx.send(Err(e)) {
                             error!("Failed to communicate runtime creation failure: {:?}", e);
@@ -802,9 +733,7 @@ impl ClientHandle {
                 };
                 wait::timeout(f, timeout)
             } else {
-                let f = async move {
-                    rx.await.map_err(|_canceled| event_loop_panicked())
-                };
+                let f = async move { rx.await.map_err(|_canceled| event_loop_panicked()) };
                 wait::timeout(f, timeout)
             };
 

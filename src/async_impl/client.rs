@@ -1,13 +1,13 @@
-#[cfg(any(
-    feature = "native-tls",
-    feature = "rustls-tls",
-))]
+#[cfg(any(feature = "native-tls", feature = "rustls-tls",))]
 use std::any::Any;
 use std::convert::TryInto;
+use std::future::Future;
 use std::net::IpAddr;
+use std::pin::Pin;
 use std::sync::Arc;
 #[cfg(feature = "cookies")]
 use std::sync::RwLock;
+use std::task::{Context, Poll};
 use std::time::Duration;
 use std::{fmt, str};
 
@@ -19,19 +19,11 @@ use http::header::{
 use http::uri::Scheme;
 use http::Uri;
 use hyper::client::ResponseFuture;
+use log::debug;
 #[cfg(feature = "native-tls-crate")]
 use native_tls_crate::TlsConnector;
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 use tokio::time::Delay;
 
-use log::debug;
-
-use super::decoder::Accepts;
-use super::request::{Request, RequestBuilder};
-use super::response::Response;
-use super::Body;
 use crate::connect::{Connector, HttpConnector};
 #[cfg(feature = "cookies")]
 use crate::cookie;
@@ -42,7 +34,12 @@ use crate::redirect::{self, remove_sensitive_headers};
 use crate::tls::TlsBackend;
 #[cfg(feature = "__tls")]
 use crate::{Certificate, Identity};
-use crate::{IntoUrl, Method, Proxy, StatusCode, Url};
+use crate::{Method, Proxy, StatusCode, Url};
+
+use super::decoder::Accepts;
+use super::request::Request;
+use super::response::Response;
+use super::Body;
 
 /// An asynchronous `Client` to make Requests with.
 ///
@@ -210,7 +207,6 @@ impl ClientBuilder {
                         }
                     }
 
-
                     Connector::new_default_tls(
                         http,
                         tls,
@@ -219,27 +215,25 @@ impl ClientBuilder {
                         config.local_address,
                         config.nodelay,
                     )?
-                },
+                }
                 #[cfg(feature = "native-tls")]
-                TlsBackend::BuiltNativeTls(conn) => {
-                    Connector::from_built_default_tls(
-                        http,
-                        conn,
-                        proxies.clone(),
-                        user_agent(&config.headers),
-                        config.local_address,
-                        config.nodelay)
-                },
+                TlsBackend::BuiltNativeTls(conn) => Connector::from_built_default_tls(
+                    http,
+                    conn,
+                    proxies.clone(),
+                    user_agent(&config.headers),
+                    config.local_address,
+                    config.nodelay,
+                ),
                 #[cfg(feature = "rustls-tls")]
-                TlsBackend::BuiltRustls(conn) => {
-                    Connector::new_rustls_tls(
-                        http,
-                        conn,
-                        proxies.clone(),
-                        user_agent(&config.headers),
-                        config.local_address,
-                        config.nodelay)
-                },
+                TlsBackend::BuiltRustls(conn) => Connector::new_rustls_tls(
+                    http,
+                    conn,
+                    proxies.clone(),
+                    user_agent(&config.headers),
+                    config.local_address,
+                    config.nodelay,
+                ),
                 #[cfg(feature = "rustls-tls")]
                 TlsBackend::Rustls => {
                     use crate::tls::NoVerifier;
@@ -274,16 +268,13 @@ impl ClientBuilder {
                         config.local_address,
                         config.nodelay,
                     )
-                },
-                #[cfg(any(
-                    feature = "native-tls",
-                    feature = "rustls-tls",
-                ))]
+                }
+                #[cfg(any(feature = "native-tls", feature = "rustls-tls",))]
                 TlsBackend::UnknownPreconfigured => {
                     return Err(crate::error::builder(
-                        "Unknown TLS backend passed to `use_preconfigured_tls`"
+                        "Unknown TLS backend passed to `use_preconfigured_tls`",
                     ));
-                },
+                }
             }
 
             #[cfg(not(feature = "__tls"))]
@@ -352,7 +343,7 @@ impl ClientBuilder {
     /// let client = reqwest::Client::builder()
     ///     .user_agent(APP_USER_AGENT)
     ///     .build()?;
-    /// let res = client.get("https://www.rust-lang.org").send().await?;
+    /// let res = reqwest::RequestBuilder::get("https://www.rust-lang.org").send(&client).await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -385,7 +376,7 @@ impl ClientBuilder {
     /// let client = reqwest::Client::builder()
     ///     .default_headers(headers)
     ///     .build()?;
-    /// let res = client.get("https://www.rust-lang.org").send().await?;
+    /// let res = reqwest::RequestBuilder::get("https://www.rust-lang.org").send(&client).await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -402,10 +393,9 @@ impl ClientBuilder {
     /// let client = reqwest::Client::builder()
     ///     .default_headers(headers)
     ///     .build()?;
-    /// let res = client
-    ///     .get("https://www.rust-lang.org")
+    /// let res = reqwest::RequestBuilder::get("https://www.rust-lang.org")
     ///     .header(header::AUTHORIZATION, "token")
-    ///     .send()
+    ///     .send(&client)
     ///     .await?;
     /// # Ok(())
     /// # }
@@ -817,15 +807,14 @@ impl ClientBuilder {
     ///
     /// This requires one of the optional features `native-tls` or
     /// `rustls-tls` to be enabled.
-    #[cfg(any(
-        feature = "native-tls",
-        feature = "rustls-tls",
-    ))]
+    #[cfg(any(feature = "native-tls", feature = "rustls-tls",))]
     pub fn use_preconfigured_tls(mut self, tls: impl Any) -> ClientBuilder {
         let mut tls = Some(tls);
         #[cfg(feature = "native-tls")]
         {
-            if let Some(conn) = (&mut tls as &mut dyn Any).downcast_mut::<Option<native_tls_crate::TlsConnector>>() {
+            if let Some(conn) =
+                (&mut tls as &mut dyn Any).downcast_mut::<Option<native_tls_crate::TlsConnector>>()
+            {
                 let tls = conn.take().expect("is definitely Some");
                 let tls = crate::tls::TlsBackend::BuiltNativeTls(tls);
                 self.config.tls = tls;
@@ -834,8 +823,9 @@ impl ClientBuilder {
         }
         #[cfg(feature = "rustls-tls")]
         {
-            if let Some(conn) = (&mut tls as &mut dyn Any).downcast_mut::<Option<rustls::ClientConfig>>() {
-
+            if let Some(conn) =
+                (&mut tls as &mut dyn Any).downcast_mut::<Option<rustls::ClientConfig>>()
+            {
                 let tls = conn.take().expect("is definitely Some");
                 let tls = crate::tls::TlsBackend::BuiltRustls(tls);
                 self.config.tls = tls;
@@ -908,73 +898,6 @@ impl Client {
         ClientBuilder::new()
     }
 
-    /// Convenience method to make a `GET` request to a URL.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn get<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.request(Method::GET, url)
-    }
-
-    /// Convenience method to make a `POST` request to a URL.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn post<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.request(Method::POST, url)
-    }
-
-    /// Convenience method to make a `PUT` request to a URL.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn put<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.request(Method::PUT, url)
-    }
-
-    /// Convenience method to make a `PATCH` request to a URL.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn patch<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.request(Method::PATCH, url)
-    }
-
-    /// Convenience method to make a `DELETE` request to a URL.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn delete<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.request(Method::DELETE, url)
-    }
-
-    /// Convenience method to make a `HEAD` request to a URL.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn head<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.request(Method::HEAD, url)
-    }
-
-    /// Start building a `Request` with the `Method` and `Url`.
-    ///
-    /// Returns a `RequestBuilder`, which will allow setting headers and
-    /// request body before sending.
-    ///
-    /// # Errors
-    ///
-    /// This method fails whenever supplied `Url` cannot be parsed.
-    pub fn request<U: IntoUrl>(&self, method: Method, url: U) -> RequestBuilder {
-        let req = url.into_url().map(move |url| Request::new(method, url));
-        RequestBuilder::new(self.clone(), req)
-    }
-
     /// Executes a `Request`.
     ///
     /// A `Request` can be built manually with `Request::new()` or obtained
@@ -995,7 +918,14 @@ impl Client {
     }
 
     pub(super) fn execute_request(&self, req: Request) -> Pending {
-        let (method, url, mut headers, body, timeout) = req.pieces();
+        let Request {
+            method,
+            url,
+            mut headers,
+            body,
+            timeout,
+            ..
+        } = req;
         if url.scheme() != "http" && url.scheme() != "https" {
             return Pending::new_err(error::url_bad_scheme(url));
         }
@@ -1330,8 +1260,8 @@ impl Future for PendingRequest {
                         .map(|cookie| cookie.into_inner().into_owned())
                         .peekable();
                     if cookies.peek().is_some() {
-                      let mut store = store_wrapper.write().unwrap();
-                      store.0.store_response_cookies(cookies, &self.url);
+                        let mut store = store_wrapper.write().unwrap();
+                        store.0.store_response_cookies(cookies, &self.url);
                     }
                 }
             }

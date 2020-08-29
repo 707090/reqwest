@@ -1,5 +1,6 @@
 mod support;
 use futures_util::stream::StreamExt;
+use reqwest::RequestBuilder;
 use support::*;
 
 #[tokio::test]
@@ -29,7 +30,7 @@ async fn test_redirect_301_and_302_and_303_changes_post_to_get() {
 
         let url = format!("http://{}/{}", redirect.addr(), code);
         let dst = format!("http://{}/{}", redirect.addr(), "dst");
-        let res = client.post(&url).send().await.unwrap();
+        let res = RequestBuilder::post(&url).send(&client).await.unwrap();
         assert_eq!(res.url().as_str(), dst);
         assert_eq!(res.status(), reqwest::StatusCode::OK);
         assert_eq!(
@@ -65,7 +66,7 @@ async fn test_redirect_307_and_308_tries_to_get_again() {
 
         let url = format!("http://{}/{}", redirect.addr(), code);
         let dst = format!("http://{}/{}", redirect.addr(), "dst");
-        let res = client.get(&url).send().await.unwrap();
+        let res = RequestBuilder::get(&url).send(&client).await.unwrap();
         assert_eq!(res.url().as_str(), dst);
         assert_eq!(res.status(), reqwest::StatusCode::OK);
         assert_eq!(
@@ -107,7 +108,11 @@ async fn test_redirect_307_and_308_tries_to_post_again() {
 
         let url = format!("http://{}/{}", redirect.addr(), code);
         let dst = format!("http://{}/{}", redirect.addr(), "dst");
-        let res = client.post(&url).body("Hello").send().await.unwrap();
+        let res = RequestBuilder::post(&url)
+            .body("Hello")
+            .send(&client)
+            .await
+            .unwrap();
         assert_eq!(res.url().as_str(), dst);
         assert_eq!(res.status(), reqwest::StatusCode::OK);
         assert_eq!(
@@ -140,10 +145,9 @@ fn test_redirect_307_does_not_try_if_reader_cannot_reset() {
         });
 
         let url = format!("http://{}/{}", redirect.addr(), code);
-        let res = client
-            .post(&url)
+        let res = reqwest::blocking::RequestBuilder::post(&url)
             .body(reqwest::blocking::Body::new(&b"Hello"[..]))
-            .send()
+            .send(&client)
             .unwrap();
         assert_eq!(res.url().as_str(), url);
         assert_eq!(res.status(), code);
@@ -183,15 +187,13 @@ async fn test_redirect_removes_sensitive_headers() {
 
     tx.broadcast(Some(mid_server.addr())).unwrap();
 
-    reqwest::Client::builder()
-        .build()
-        .unwrap()
-        .get(&format!("http://{}/sensitive", mid_server.addr()))
+    let client = reqwest::Client::builder().build().unwrap();
+    RequestBuilder::get(&format!("http://{}/sensitive", mid_server.addr()))
         .header(
             reqwest::header::COOKIE,
             reqwest::header::HeaderValue::from_static("foo=bar"),
         )
-        .send()
+        .send(&client)
         .await
         .unwrap();
 }
@@ -225,14 +227,11 @@ async fn test_redirect_policy_can_stop_redirects_without_an_error() {
 
     let url = format!("http://{}/no-redirect", server.addr());
 
-    let res = reqwest::Client::builder()
+    let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .build()
-        .unwrap()
-        .get(&url)
-        .send()
-        .await
         .unwrap();
+    let res = RequestBuilder::get(&url).send(&client).await.unwrap();
 
     assert_eq!(res.url().as_str(), url);
     assert_eq!(res.status(), reqwest::StatusCode::FOUND);
@@ -255,12 +254,9 @@ async fn test_referer_is_not_set_if_disabled() {
         }
     });
 
-    reqwest::Client::builder()
-        .referer(false)
-        .build()
-        .unwrap()
-        .get(&format!("http://{}/no-refer", server.addr()))
-        .send()
+    let client = reqwest::Client::builder().referer(false).build().unwrap();
+    RequestBuilder::get(&format!("http://{}/no-refer", server.addr()))
+        .send(&client)
         .await
         .unwrap();
 }
@@ -309,7 +305,7 @@ async fn test_redirect_302_with_set_cookies() {
         .cookie_store(true)
         .build()
         .unwrap();
-    let res = client.get(&url).send().await.unwrap();
+    let res = RequestBuilder::get(&url).send(&client).await.unwrap();
 
     assert_eq!(res.url().as_str(), dst);
     assert_eq!(res.status(), reqwest::StatusCode::OK);

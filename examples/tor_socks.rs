@@ -1,5 +1,7 @@
 #![deny(warnings)]
 
+use reqwest::RequestBuilder;
+
 // This is using the `tokio` runtime. You'll need the following dependency:
 //
 // `tokio = { version = "0.2", features = ["macros"] }`
@@ -12,7 +14,9 @@ async fn main() -> Result<(), reqwest::Error> {
         .build()
         .expect("should be able to build reqwest client");
 
-    let res = client.get("https://check.torproject.org").send().await?;
+    let res = RequestBuilder::get("https://check.torproject.org")
+        .send(&client)
+        .await?;
     println!("Status: {}", res.status());
 
     let text = res.text().await?;

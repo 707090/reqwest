@@ -26,10 +26,9 @@
 //!
 //! // And finally, send the form
 //! let client = reqwest::blocking::Client::new();
-//! let resp = client
-//!     .post("http://localhost:8080/user")
+//! let resp = reqwest::blocking::RequestBuilder::post("http://localhost:8080/user")
 //!     .multipart(form)
-//!     .send()?;
+//!     .send(&client)?;
 //! # Ok(())
 //! # }
 //! # fn main() {}

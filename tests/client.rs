@@ -2,7 +2,7 @@ mod support;
 use futures_util::stream::StreamExt;
 use support::*;
 
-use reqwest::Client;
+use reqwest::{Client, RequestBuilder};
 
 #[tokio::test]
 async fn auto_headers() {
@@ -43,12 +43,12 @@ async fn user_agent() {
     });
 
     let url = format!("http://{}/ua", server.addr());
-    let res = reqwest::Client::builder()
+    let client = reqwest::Client::builder()
         .user_agent("reqwest-test-agent")
         .build()
-        .expect("client builder")
-        .get(&url)
-        .send()
+        .expect("client builder");
+    let res = RequestBuilder::get(&url)
+        .send(&client)
         .await
         .expect("request");
 
@@ -63,9 +63,8 @@ async fn response_text() {
 
     let client = Client::new();
 
-    let res = client
-        .get(&format!("http://{}/text", server.addr()))
-        .send()
+    let res = RequestBuilder::get(&format!("http://{}/text", server.addr()))
+        .send(&client)
         .await
         .expect("Failed to get");
     assert_eq!(res.content_length(), Some(5));
@@ -81,9 +80,8 @@ async fn response_bytes() {
 
     let client = Client::new();
 
-    let res = client
-        .get(&format!("http://{}/bytes", server.addr()))
-        .send()
+    let res = RequestBuilder::get(&format!("http://{}/bytes", server.addr()))
+        .send(&client)
         .await
         .expect("Failed to get");
     assert_eq!(res.content_length(), Some(5));
@@ -100,9 +98,8 @@ async fn response_json() {
 
     let client = Client::new();
 
-    let res = client
-        .get(&format!("http://{}/json", server.addr()))
-        .send()
+    let res = RequestBuilder::get(&format!("http://{}/json", server.addr()))
+        .send(&client)
         .await
         .expect("Failed to get");
     let text = res.json::<String>().await.expect("Failed to get json");
@@ -133,9 +130,8 @@ async fn body_pipe_response() {
 
     let client = Client::new();
 
-    let res1 = client
-        .get(&format!("http://{}/get", server.addr()))
-        .send()
+    let res1 = RequestBuilder::get(&format!("http://{}/get", server.addr()))
+        .send(&client)
         .await
         .expect("get1");
 
@@ -143,10 +139,9 @@ async fn body_pipe_response() {
     assert_eq!(res1.content_length(), Some(7));
 
     // and now ensure we can "pipe" the response to another request
-    let res2 = client
-        .post(&format!("http://{}/pipe", server.addr()))
+    let res2 = RequestBuilder::post(&format!("http://{}/pipe", server.addr()))
         .body(res1)
-        .send()
+        .send(&client)
         .await
         .expect("res2");
 
