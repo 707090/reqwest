@@ -7,6 +7,7 @@ use bytes::Bytes;
 use futures_core::Stream;
 use http_body::Body as HttpBody;
 use tokio::time::Delay;
+use fallible::TryClone;
 
 /// An asynchronous request body.
 pub struct Body {
@@ -135,13 +136,6 @@ impl Body {
         (reuse, self)
     }
 
-    pub(crate) fn try_clone(&self) -> Option<Body> {
-        match self.inner {
-            Inner::Reusable(ref chunk) => Some(Body::reusable(chunk.clone())),
-            Inner::Streaming { .. } => None,
-        }
-    }
-
     pub(crate) fn into_stream(self) -> ImplStream {
         ImplStream(self)
     }
@@ -150,6 +144,17 @@ impl Body {
         match self.inner {
             Inner::Reusable(ref bytes) => Some(bytes.len() as u64),
             Inner::Streaming { ref body, .. } => body.size_hint().exact(),
+        }
+    }
+}
+
+impl TryClone for Body {
+    type Error = crate::error::Error;
+
+    fn try_clone(&self) -> Result<Self, Self::Error> {
+        match self.inner {
+            Inner::Reusable(ref chunk) => Ok(Body::reusable(chunk.clone())),
+            Inner::Streaming { .. } => Err(crate::error::builder(crate::error::CannotCloneStreamingBodyError)),
         }
     }
 }

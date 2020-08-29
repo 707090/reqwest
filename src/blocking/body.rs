@@ -8,6 +8,7 @@ use std::ptr;
 use bytes::Bytes;
 
 use crate::async_impl;
+use fallible::TryClone;
 
 /// The body of a `Request`.
 ///
@@ -142,8 +143,12 @@ impl Body {
             }
         }
     }
+}
 
-    pub(crate) fn try_clone(&self) -> Option<Body> {
+impl TryClone for Body {
+    type Error = crate::error::Error;
+
+    fn try_clone(&self) -> Result<Self, Self::Error> {
         self.kind.try_clone().map(|kind| Body { kind })
     }
 }
@@ -153,11 +158,13 @@ enum Kind {
     Bytes(Bytes),
 }
 
-impl Kind {
-    fn try_clone(&self) -> Option<Kind> {
+impl TryClone for Kind {
+    type Error = crate::error::Error;
+
+    fn try_clone(&self) -> Result<Self, Self::Error> {
         match self {
-            Kind::Reader(..) => None,
-            Kind::Bytes(v) => Some(Kind::Bytes(v.clone())),
+            Kind::Reader(..) => Err(crate::error::builder(crate::error::CannotCloneReaderBodyError)),
+            Kind::Bytes(v) => Ok(Kind::Bytes(v.clone())),
         }
     }
 }

@@ -2,6 +2,7 @@
 use std::error::Error as StdError;
 use std::fmt;
 use std::io;
+use std::sync::Arc;
 
 use crate::{StatusCode, Url};
 
@@ -9,15 +10,17 @@ use crate::{StatusCode, Url};
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// The Errors that may occur when processing a `Request`.
+#[derive(Clone)]
 pub struct Error {
     inner: Box<Inner>,
 }
 
 pub(crate) type BoxError = Box<dyn StdError + Send + Sync>;
 
+#[derive(Clone)]
 struct Inner {
     kind: Kind,
-    source: Option<BoxError>,
+    source: Option<Arc<BoxError>>,
     url: Option<Url>,
 }
 
@@ -29,7 +32,7 @@ impl Error {
         Error {
             inner: Box::new(Inner {
                 kind,
-                source: source.map(Into::into),
+                source: source.map(Into::into).map(Arc::new),
                 url: None,
             }),
         }
@@ -199,7 +202,7 @@ impl fmt::Display for Error {
 
 impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        self.inner.source.as_ref().map(|e| &**e as _)
+        self.inner.source.as_ref().map(|e| &***e as _)
     }
 }
 
@@ -217,7 +220,7 @@ impl From<crate::error::Error> for js_sys::Error {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum Kind {
     Builder,
     Request,
@@ -284,16 +287,21 @@ pub(crate) fn decode_io(e: io::Error) -> Error {
 
 // internal Error "sources"
 
-#[derive(Debug)]
-pub(crate) struct TimedOut;
-
-impl fmt::Display for TimedOut {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("operation timed out")
-    }
+macro_rules! string_error_type {
+	($type_:ident, $message:literal) => {
+		#[derive(Debug)]
+		pub(crate) struct $type_;
+		impl fmt::Display for $type_ {
+			fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+				f.write_str($message)
+			}
+		}
+		impl StdError for $type_ {}
+	}
 }
-
-impl StdError for TimedOut {}
+string_error_type!(TimedOut, "operation timed out");
+string_error_type!(CannotCloneStreamingBodyError, "Cannot clone streaming bodies");
+string_error_type!(CannotCloneReaderBodyError, "Cannot clone reader bodies");
 
 #[cfg(test)]
 mod tests {

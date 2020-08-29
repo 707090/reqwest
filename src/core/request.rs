@@ -7,6 +7,7 @@ use serde::Serialize;
 #[cfg(feature = "json")]
 use serde_json;
 use url::Url;
+use fallible::TryClone;
 
 use crate::header::{HeaderMap, HeaderName, HeaderValue, CONTENT_TYPE};
 use crate::IntoUrl;
@@ -94,6 +95,22 @@ impl<Body> Request<Body> {
     #[inline]
     pub fn timeout_mut(&mut self) -> &mut Option<Duration> {
         &mut self.timeout
+    }
+}
+
+impl<Body: TryClone<Error=crate::error::Error>> TryClone for Request<Body> {
+    type Error = crate::error::Error;
+
+    fn try_clone(&self) -> Result<Self, Self::Error> {
+        let body = match self.body.as_ref() {
+            Some(ref body) => Some((*body).try_clone()?),
+            None => None,
+        };
+        let mut req = Request::new(self.method().clone(), self.url().clone());
+        *req.timeout_mut() = self.timeout().cloned();
+        *req.headers_mut() = self.headers().clone();
+        req.body = body;
+        Ok(req)
     }
 }
 
@@ -593,6 +610,64 @@ impl<Body: From<Vec<u8>> + From<String>> RequestBuilder<Body> {
     /// `Client::execute()`.
     pub fn build(self) -> crate::Result<Request<Body>> {
         self.request
+    }
+}
+
+impl<Body: TryClone<Error=crate::error::Error>> TryClone for RequestBuilder<Body> {
+    type Error = crate::error::Error;
+
+    /// Attempts to clone the `RequestBuilder`.
+    ///
+    /// Err is returned if a body is which can not be cloned. This can be because the body is a
+    /// stream.
+    ///
+    /// # Examples
+    ///
+    /// With a static body
+    ///
+    /// ```rust
+    /// # use fallible::TryClone;
+    /// # fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let builder = reqwest::RequestBuilder::post("http://httpbin.org/post")
+    ///     .body("from a &str!");
+    /// let clone = builder.try_clone();
+    /// assert!(clone.is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Without a body
+    ///
+    /// ```rust
+    /// # use fallible::TryClone;
+    /// # fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let builder = reqwest::RequestBuilder::get("http://httpbin.org/get");
+    /// let clone = builder.try_clone();
+    /// assert!(clone.is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
+    // Need to temporarily remove this example because it requires the blocking feature and blocking-specific body type
+    //
+    // With a non-clonable body
+    //
+    // ```rust
+    // # use fallible::TryClone;
+    // # fn run() -> Result<(), Box<dyn std::error::Error>> {
+    // let builder = reqwest::RequestBuilder::get("http://httpbin.org/get")
+    //     .body(reqwest::Body::new(std::io::empty()));
+    // let clone = builder.try_clone();
+    // assert!(clone.is_err());
+    // # Ok(())
+    // # }
+    // ```
+    fn try_clone(&self) -> Result<Self, Self::Error> {
+        match self.request {
+            Ok(ref req) => Ok(RequestBuilder {
+                request: Ok((*req).try_clone()?),
+            }),
+            Err(ref err) => Err(err.clone())
+        }
     }
 }
 
